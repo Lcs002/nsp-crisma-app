@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link'; // --- NEW --- Import Link
 import { Confirmand } from '@/types';
 import AddConfirmandForm from './components/AddConfirmandForm';
 import EditConfirmandModal from './components/EditConfirmandModal';
@@ -9,22 +10,15 @@ export default function Home() {
   const [confirmands, setConfirmands] = useState<Confirmand[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // State to manage which participant is being edited. If null, the modal is hidden.
   const [editingConfirmand, setEditingConfirmand] = useState<Confirmand | null>(null);
 
   useEffect(() => {
     async function fetchConfirmands() {
       try {
         const response = await fetch('/api/confirmands');
-        if (!response.ok) {
-          throw new Error('Failed to fetch data from the server.');
-        }
+        if (!response.ok) throw new Error('Failed to fetch data from the server.');
         const data: Confirmand[] = await response.json();
-        if (!Array.isArray(data)) {
-          throw new Error("Invalid data format received from server.");
-        }
-        // Sort the initial data by name
+        if (!Array.isArray(data)) throw new Error("Invalid data format received from server.");
         const sortedData = data.sort((a, b) => a.full_name.localeCompare(b.full_name));
         setConfirmands(sortedData);
       } catch (err: any) {
@@ -36,14 +30,12 @@ export default function Home() {
     fetchConfirmands();
   }, []);
 
-  // Callback for when a new participant is added via the form
   const handleConfirmandAdded = (newConfirmand: Confirmand) => {
     setConfirmands((prev) => 
       [...prev, newConfirmand].sort((a, b) => a.full_name.localeCompare(b.full_name))
     );
   };
 
-  // Callback for when a participant is updated via the modal
   const handleConfirmandUpdated = (updatedConfirmand: Confirmand) => {
     setConfirmands((prev) => 
       prev.map(c => c.id === updatedConfirmand.id ? updatedConfirmand : c)
@@ -51,11 +43,8 @@ export default function Home() {
     );
   };
 
-  // Handler for deleting a participant
   const handleDelete = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete this participant? This action cannot be undone.')) {
-      return;
-    }
+    if (!window.confirm('Are you sure you want to delete this participant? This action cannot be undone.')) return;
     try {
       const response = await fetch(`/api/confirmands/${id}`, { method: 'DELETE' });
       if (!response.ok) {
@@ -92,7 +81,13 @@ export default function Home() {
             <tbody>
               {confirmands.map((c) => (
                 <tr key={c.id} className="bg-white border-b hover:bg-gray-50">
-                  <td className="py-4 px-6 font-medium text-gray-900 whitespace-nowrap">{c.full_name}</td>
+                  {/* --- MODIFICATION HERE --- */}
+                  <td className="py-4 px-6 font-medium text-gray-900 whitespace-nowrap">
+                    <Link href={`/participants/${c.id}`} className="hover:underline text-indigo-700">
+                      {c.full_name}
+                    </Link>
+                  </td>
+                  {/* --- END MODIFICATION --- */}
                   <td className="py-4 px-6">{c.email}</td>
                   <td className="py-4 px-6">{c.phone_number}</td>
                   <td className="py-4 px-6">{c.marital_status}</td>
@@ -111,7 +106,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* Conditionally render the Edit Modal */}
       {editingConfirmand && (
         <EditConfirmandModal 
           confirmand={editingConfirmand}

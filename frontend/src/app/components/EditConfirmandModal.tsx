@@ -1,7 +1,6 @@
-// frontend/src/app/components/EditConfirmandModal.tsx
 'use client';
 
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, FormEvent } from 'react';
 import { Confirmand } from '@/types';
 
 interface EditConfirmandModalProps {
@@ -11,21 +10,20 @@ interface EditConfirmandModalProps {
 }
 
 export default function EditConfirmandModal({ confirmand, onClose, onConfirmandUpdated }: EditConfirmandModalProps) {
-  // Initialize form state with the data of the participant being edited
   const [fullName, setFullName] = useState(confirmand.full_name);
   const [email, setEmail] = useState(confirmand.email);
   const [phone, setPhone] = useState(confirmand.phone_number);
-  // The date from the DB is a full ISO string, but the input needs YYYY-MM-DD
-  const [birthDate, setBirthDate] = useState(new Date(confirmand.creation_date).toISOString().split('T')[0]);
-  const [address, setAddress] = useState(''); // Assuming address is not fetched in the list view yet
+  const [birthDate, setBirthDate] = useState(confirmand.birth_date);
+  const [address, setAddress] = useState(confirmand.address);
   const [maritalStatus, setMaritalStatus] = useState(confirmand.marital_status);
+  const [fatherName, setFatherName] = useState(confirmand.father_name || '');
+  const [motherName, setMotherName] = useState(confirmand.mother_name || '');
+  const [baptismChurch, setBaptismChurch] = useState(confirmand.baptism_church || '');
+  const [communionChurch, setCommunionChurch] = useState(confirmand.communion_church || '');
 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Note: A more advanced version would fetch the full confirmand details here
-  // if the list view doesn't contain all fields (like address). For now, we'll assume it does.
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -36,8 +34,12 @@ export default function EditConfirmandModal({ confirmand, onClose, onConfirmandU
       email: email,
       phone_number: phone,
       birth_date: birthDate,
-      address: address || 'N/A', // Handle empty address
+      address: address,
       marital_status: maritalStatus,
+      father_name: fatherName || null,
+      mother_name: motherName || null,
+      baptism_church: baptismChurch || null,
+      communion_church: communionChurch || null,
     };
 
     try {
@@ -53,42 +55,97 @@ export default function EditConfirmandModal({ confirmand, onClose, onConfirmandU
       }
 
       const updatedData: Confirmand = await response.json();
-      onConfirmandUpdated(updatedData); // Notify parent component of the change
-      onClose(); // Close the modal
+      onConfirmandUpdated(updatedData);
+      onClose();
 
+    // --- THIS IS THE CORRECTED BLOCK ---
     } catch (err: any) {
       setError(err.message);
-    } finally {
+    } 
+    // --- END CORRECTION ---
+    finally {
       setIsSubmitting(false);
     }
   };
   
   return (
-    // Modal backdrop
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
-      {/* Modal content */}
-      <div className="bg-white p-8 rounded-lg shadow-xl w-full max-w-2xl">
-        <h2 className="text-2xl font-semibold mb-4">Edit Participant</h2>
-        {/* We can reuse the same form structure as AddConfirmandForm */}
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white p-6 md:p-8 rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-semibold text-gray-800">Edit Participant</h2>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+        </div>
+        
         <form onSubmit={handleSubmit}>
-          {/* Form fields pre-filled with state values */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+            
+            <h3 className="md:col-span-2 text-lg font-medium text-gray-900 border-b pb-2">Personal Information</h3>
+            
             <div>
               <label htmlFor="editFullName" className="block text-sm font-medium text-gray-700">Full Name</label>
-              <input type="text" id="editFullName" value={fullName} onChange={(e) => setFullName(e.target.value)} required className="mt-1 block w-full rounded-md border-gray-300" />
+              <input type="text" id="editFullName" value={fullName} onChange={(e) => setFullName(e.target.value)} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
             </div>
             <div>
-              <label htmlFor="editEmail" className="block text-sm font-medium text-gray-700">Email</label>
-              <input type="email" id="editEmail" value={email} onChange={(e) => setEmail(e.target.value)} required className="mt-1 block w-full rounded-md border-gray-300" />
+              <label htmlFor="editBirthDate" className="block text-sm font-medium text-gray-700">Birth Date</label>
+              <input type="date" id="editBirthDate" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
             </div>
-            {/* Add the other fields (phone, birth_date, address, marital_status) here, similar to the Add form */}
+            <div className="md:col-span-2">
+              <label htmlFor="editAddress" className="block text-sm font-medium text-gray-700">Address</label>
+              <input type="text" id="editAddress" value={address} onChange={(e) => setAddress(e.target.value)} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+            </div>
+            <div>
+              <label htmlFor="editEmail" className="block text-sm font-medium text-gray-700">Email Address</label>
+              <input type="email" id="editEmail" value={email} onChange={(e) => setEmail(e.target.value)} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+            </div>
+            <div>
+              <label htmlFor="editPhone" className="block text-sm font-medium text-gray-700">Phone Number</label>
+              <input type="tel" id="editPhone" value={phone} onChange={(e) => setPhone(e.target.value)} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+            </div>
+            <div>
+              <label htmlFor="editMaritalStatus" className="block text-sm font-medium text-gray-700">Marital Status</label>
+              <select id="editMaritalStatus" value={maritalStatus} onChange={(e) => setMaritalStatus(e.target.value)} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <option value="Single">Single</option>
+                <option value="Married - Church">Married - Church</option>
+                <option value="Married - Civil">Married - Civil</option>
+                <option value="Union">Union</option>
+                <option value="Divorced">Divorced</option>
+                <option value="Widowed">Widowed</option>
+              </select>
+            </div>
+
+            <h3 className="md:col-span-2 text-lg font-medium text-gray-900 border-b pb-2 mt-4">Additional Information (Optional)</h3>
+
+            <div>
+              <label htmlFor="editFatherName" className="block text-sm font-medium text-gray-700">Father's Full Name</label>
+              <input type="text" id="editFatherName" value={fatherName} onChange={(e) => setFatherName(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+            </div>
+            <div>
+              <label htmlFor="editMotherName" className="block text-sm font-medium text-gray-700">Mother's Full Name</label>
+              <input type="text" id="editMotherName" value={motherName} onChange={(e) => setMotherName(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+            </div>
+            <div>
+              <label htmlFor="editBaptismChurch" className="block text-sm font-medium text-gray-700">Church of Baptism</label>
+              <input type="text" id="editBaptismChurch" value={baptismChurch} onChange={(e) => setBaptismChurch(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+            </div>
+            <div>
+              <label htmlFor="editCommunionChurch" className="block text-sm font-medium text-gray-700">Church of First Communion</label>
+              <input type="text" id="editCommunionChurch" value={communionChurch} onChange={(e) => setCommunionChurch(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+            </div>
           </div>
 
-          {error && <p className="text-red-500 mt-2">{error}</p>}
+          {error && <p className="text-red-600 mt-4 text-sm">{error}</p>}
           
-          <div className="mt-6 flex justify-end gap-4">
-            <button type="button" onClick={onClose} className="py-2 px-4 border rounded-md text-sm">Cancel</button>
-            <button type="submit" disabled={isSubmitting} className="py-2 px-4 border border-transparent rounded-md text-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400">
+          <div className="mt-8 flex justify-end gap-4">
+            <button type="button" onClick={onClose} className="py-2 px-4 border border-gray-300 bg-white rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+              Cancel
+            </button>
+            <button type="submit" disabled={isSubmitting} className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400">
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </button>
           </div>

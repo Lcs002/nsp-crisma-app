@@ -3,9 +3,6 @@ use serde::{Deserialize, Serialize};
 use tokio_postgres::Row;
 use strum::ToString;
 
-// (All existing Enums and Confirmand/Catechist models are unchanged)
-// ...
-
 // ===================================================================
 // Custom ENUM Types
 // ===================================================================
@@ -40,44 +37,63 @@ pub enum DayOfTheWeek {
 }
 
 // ===================================================================
-// Confirmand Models
+// Confirmand Models --- MODIFIED ---
 // ===================================================================
 
+// This struct now includes all fields needed for creating and updating a confirmand.
 #[derive(Deserialize)]
 pub struct CreateConfirmand {
     pub full_name: String,
-    pub email: String,
-    pub phone_number: String,
     pub birth_date: NaiveDate,
     pub address: String,
+    pub phone_number: String,
+    pub email: String,
     pub marital_status: MaritalStatus,
+    pub father_name: Option<String>,
+    pub mother_name: Option<String>,
+    pub baptism_church: Option<String>,
+    pub communion_church: Option<String>,
 }
 
-#[derive(Serialize, Clone)] // --- Added Clone for use in the detail view
+// This struct now represents a full confirmand record, including all optional fields.
+#[derive(Serialize, Clone)]
 pub struct Confirmand {
     pub id: i32,
     pub full_name: String,
-    pub email: String,
+    pub birth_date: NaiveDate,
+    pub address: String,
     pub phone_number: String,
+    pub email: String,
     pub marital_status: String,
+    pub father_name: Option<String>,
+    pub mother_name: Option<String>,
+    pub baptism_church: Option<String>,
+    pub communion_church: Option<String>,
     pub creation_date: DateTime<Utc>,
 }
 
+// The `From<Row>` implementation is updated to get all the new fields.
 impl From<Row> for Confirmand {
     fn from(row: Row) -> Self {
         Self {
             id: row.get("id"),
             full_name: row.get("full_name"),
-            email: row.get("email"),
+            birth_date: row.get("birth_date"),
+            address: row.get("address"),
             phone_number: row.get("phone_number"),
+            email: row.get("email"),
             marital_status: row.get("marital_status"),
+            father_name: row.get("father_name"),
+            mother_name: row.get("mother_name"),
+            baptism_church: row.get("baptism_church"),
+            communion_church: row.get("communion_church"),
             creation_date: row.get("creation_date"),
         }
     }
 }
 
 // ===================================================================
-// Catechist Models
+// Catechist Models (unchanged)
 // ===================================================================
 
 #[derive(Deserialize)]
@@ -104,7 +120,7 @@ impl From<Row> for Catechist {
 }
 
 // ===================================================================
-// Confirmation Group Models
+// Confirmation Group Models (unchanged)
 // ===================================================================
 
 #[derive(Deserialize)]
@@ -144,15 +160,11 @@ impl From<Row> for ConfirmationGroup {
     }
 }
 
-// --- NEW --- Models for the Group Detail View --- NEW ---
-
-// Represents the payload for adding a participant to a group
 #[derive(Deserialize)]
 pub struct AddParticipantToGroup {
     pub confirmand_id: i32,
 }
 
-// Represents the full details of a group, including its members
 #[derive(Serialize)]
 pub struct ConfirmationGroupDetails {
     pub id: i32,
@@ -160,5 +172,36 @@ pub struct ConfirmationGroupDetails {
     pub catechist_name: Option<String>,
     pub day_of_the_week: String,
     pub start_date: NaiveDate,
-    pub members: Vec<Confirmand>, // A list of participants in the group
+    pub members: Vec<Confirmand>,
+}
+
+// ===================================================================
+// Sacrament & Participant Detail Models (unchanged)
+// ===================================================================
+
+#[derive(Serialize, Clone, Debug)]
+pub struct Sacrament {
+    pub id: i16,
+    pub name: String,
+}
+
+impl From<Row> for Sacrament {
+    fn from(row: Row) -> Self {
+        Self {
+            id: row.get("id"),
+            name: row.get("name"),
+        }
+    }
+}
+
+#[derive(Deserialize)]
+pub struct UpdateParticipantSacrament {
+    pub sacrament_id: i16,
+}
+
+#[derive(Serialize)]
+pub struct ConfirmandDetails {
+    #[serde(flatten)]
+    pub confirmand: Confirmand,
+    pub sacraments: Vec<Sacrament>,
 }

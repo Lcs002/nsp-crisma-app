@@ -19,11 +19,18 @@ async fn main() {
 
     // --- FIX IS HERE: All routes are now in one continuous chain ---
     let app = Router::new()
+        .route("/api/sacraments", get(handlers::list_all_sacraments))
         // Confirmand Routes
         .route("/api/confirmands", get(handlers::list_confirmands))
         .route("/api/confirmands", post(handlers::create_confirmand))
         .route("/api/confirmands/:id", put(handlers::update_confirmand))
         .route("/api/confirmands/:id", delete(handlers::delete_confirmand))
+        .route("/api/confirmands/:id/details", get(handlers::get_participant_details))
+        .route("/api/confirmands/:id/sacraments", post(handlers::add_sacrament_to_participant))
+        .route(
+            "/api/confirmands/:confirmandId/sacraments/:sacramentId",
+            delete(handlers::remove_sacrament_from_participant),
+        )
         
         // Catechist Routes
         .route("/api/catechists", get(handlers::list_catechists))

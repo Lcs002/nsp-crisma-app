@@ -1,100 +1,110 @@
 use axum::{extract::{Path, State}, http::StatusCode, Json};
-use crate::{models::{Confirmand, CreateConfirmand, Catechist, CreateCatechist, ConfirmationGroup, CreateConfirmationGroup, AddParticipantToGroup, ConfirmationGroupDetails}, AppState};
+use crate::{models::{Confirmand, CreateConfirmand, Catechist, CreateCatechist, ConfirmationGroup, CreateConfirmationGroup, AddParticipantToGroup, ConfirmationGroupDetails, Sacrament, ConfirmandDetails, UpdateParticipantSacrament}, AppState};
 
+// MODIFICATION: The SELECT query now fetches all columns.
 pub async fn list_confirmands(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Confirmand>>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
-
-    let rows = conn
-        .query("SELECT id, full_name, email, phone_number, creation_date, marital_status::TEXT as marital_status FROM confirmands ORDER BY full_name", &[])
-        .await
-        .map_err(internal_error)?;
-
+    let sql = "
+        SELECT 
+            id, full_name, email, phone_number, creation_date, marital_status::TEXT as marital_status,
+            birth_date, address, father_name, mother_name, baptism_church, communion_church
+        FROM confirmands 
+        ORDER BY full_name
+    ";
+    let rows = conn.query(sql, &[]).await.map_err(internal_error)?;
     let confirmands: Vec<Confirmand> = rows.into_iter().map(Confirmand::from).collect();
     Ok(Json(confirmands))
 }
 
+// MODIFICATION: The INSERT and RETURNING statements now include all columns.
 pub async fn create_confirmand(
     State(state): State<AppState>,
     Json(payload): Json<CreateConfirmand>,
 ) -> Result<(StatusCode, Json<Confirmand>), (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
-    
     let row = conn
         .query_one(
-            "INSERT INTO confirmands (full_name, email, phone_number, birth_date, address, marital_status) 
-             VALUES ($1, $2, $3, $4, $5, CAST($6 AS VARCHAR)::marital_status_enum) 
-             RETURNING id, full_name, email, phone_number, creation_date, marital_status::TEXT as marital_status",
+            "INSERT INTO confirmands (
+                full_name, birth_date, address, phone_number, email, marital_status, 
+                father_name, mother_name, baptism_church, communion_church
+             ) 
+             VALUES ($1, $2, $3, $4, $5, CAST($6 AS VARCHAR)::marital_status_enum, $7, $8, $9, $10) 
+             RETURNING 
+                id, full_name, email, phone_number, creation_date, marital_status::TEXT as marital_status,
+                birth_date, address, father_name, mother_name, baptism_church, communion_church
+            ",
             &[
                 &payload.full_name,
-                &payload.email,
-                &payload.phone_number,
                 &payload.birth_date,
                 &payload.address,
+                &payload.phone_number,
+                &payload.email,
                 &payload.marital_status.to_string(),
+                &payload.father_name,
+                &payload.mother_name,
+                &payload.baptism_church,
+                &payload.communion_church,
             ],
         )
         .await
         .map_err(internal_error)?;
-
     let new_confirmand = Confirmand::from(row);
     Ok((StatusCode::CREATED, Json(new_confirmand)))
-}
-
-pub async fn delete_confirmand(
-    State(state): State<AppState>,
-    Path(id): Path<i32>, // Axum extracts the `:id` from the path into this variable
-) -> Result<StatusCode, (StatusCode, String)> {
-    let conn = state.get().await.map_err(internal_error)?;
-
-    let result = conn
-        .execute("DELETE FROM confirmands WHERE id = $1", &[&id])
-        .await
-        .map_err(internal_error)?;
-
-    // The `execute` method returns the number of rows affected.
-    // If it's 0, it means no participant with that ID was found.
-    if result == 0 {
-        return Err((StatusCode::NOT_FOUND, format!("Participant with ID {} not found", id)));
-    }
-
-    // If successful, return a 204 No Content status code, which is standard for DELETE.
-    Ok(StatusCode::NO_CONTENT)
 }
 
 pub async fn update_confirmand(
     State(state): State<AppState>,
     Path(id): Path<i32>,
-    Json(payload): Json<CreateConfirmand>, // The updated data
+    Json(payload): Json<CreateConfirmand>,
 ) -> Result<Json<Confirmand>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
-
-    // The UPDATE query sets each field based on the payload.
-    // We use RETURNING to get the updated record back in one go.
     let row = conn
         .query_one(
             "UPDATE confirmands 
-             SET full_name = $1, email = $2, phone_number = $3, birth_date = $4, address = $5, marital_status = CAST($6 AS VARCHAR)::marital_status_enum 
-             WHERE id = $7 
-             RETURNING id, full_name, email, phone_number, creation_date, marital_status::TEXT as marital_status",
+             SET 
+                full_name = $1, birth_date = $2, address = $3, phone_number = $4, email = $5, 
+                marital_status = CAST($6 AS VARCHAR)::marital_status_enum,
+                father_name = $7, mother_name = $8, baptism_church = $9, communion_church = $10
+             WHERE id = $11 
+             RETURNING 
+                id, full_name, email, phone_number, creation_date, marital_status::TEXT as marital_status,
+                birth_date, address, father_name, mother_name, baptism_church, communion_church
+            ",
             &[
                 &payload.full_name,
-                &payload.email,
-                &payload.phone_number,
                 &payload.birth_date,
                 &payload.address,
+                &payload.phone_number,
+                &payload.email,
                 &payload.marital_status.to_string(),
+                &payload.father_name,
+                &payload.mother_name,
+                &payload.baptism_church,
+                &payload.communion_church,
                 &id,
             ],
         )
         .await
         .map_err(internal_error)?;
-    
-    // Convert the returned row into our Confirmand struct
     let updated_confirmand = Confirmand::from(row);
-
     Ok(Json(updated_confirmand))
+}
+
+pub async fn delete_confirmand(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let conn = state.get().await.map_err(internal_error)?;
+    let result = conn
+        .execute("DELETE FROM confirmands WHERE id = $1", &[&id])
+        .await
+        .map_err(internal_error)?;
+    if result == 0 {
+        return Err((StatusCode::NOT_FOUND, format!("Participant with ID {} not found", id)));
+    }
+    Ok(StatusCode::NO_CONTENT)
 }
 
 // Handler for `GET /api/catechists`
@@ -285,6 +295,79 @@ pub async fn remove_participant_from_group(
 
     // DELETE is idempotent, so we don't need to check if a row was actually deleted.
     // We just ensure the state is what the user wants (the link doesn't exist).
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// Handler for `GET /api/sacraments`
+pub async fn list_all_sacraments(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<Sacrament>>, (StatusCode, String)> {
+    let conn = state.get().await.map_err(internal_error)?;
+    let rows = conn
+        .query("SELECT id, name FROM sacraments ORDER BY id", &[])
+        .await
+        .map_err(internal_error)?;
+    let sacraments: Vec<Sacrament> = rows.into_iter().map(Sacrament::from).collect();
+    Ok(Json(sacraments))
+}
+
+// Handler for `GET /api/confirmands/:id/details`
+pub async fn get_participant_details(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> Result<Json<ConfirmandDetails>, (StatusCode, String)> {
+    let conn = state.get().await.map_err(internal_error)?;
+
+    let confirmand_sql = "
+        SELECT 
+            id, full_name, email, phone_number, creation_date, marital_status::TEXT as marital_status,
+            birth_date, address, father_name, mother_name, baptism_church, communion_church
+        FROM confirmands 
+        WHERE id = $1
+    ";
+    let confirmand_row = conn.query_one(confirmand_sql, &[&id]).await.map_err(internal_error)?;
+    let confirmand = Confirmand::from(confirmand_row);
+
+    let sacraments_sql = "
+        SELECT s.id, s.name 
+        FROM sacraments s
+        INNER JOIN confirmand_sacraments cs ON s.id = cs.sacrament_id
+        WHERE cs.confirmand_id = $1
+        ORDER BY s.id
+    ";
+    let sacrament_rows = conn.query(sacraments_sql, &[&id]).await.map_err(internal_error)?;
+    let sacraments: Vec<Sacrament> = sacrament_rows.into_iter().map(Sacrament::from).collect();
+
+    let details = ConfirmandDetails {
+        confirmand,
+        sacraments,
+    };
+    Ok(Json(details))
+}
+
+// Handler for `POST /api/confirmands/:id/sacraments`
+pub async fn add_sacrament_to_participant(
+    State(state): State<AppState>,
+    Path(confirmand_id): Path<i32>,
+    Json(payload): Json<UpdateParticipantSacrament>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let conn = state.get().await.map_err(internal_error)?;
+    let sql = "
+        INSERT INTO confirmand_sacraments (confirmand_id, sacrament_id)
+        VALUES ($1, $2) ON CONFLICT DO NOTHING
+    ";
+    conn.execute(sql, &[&confirmand_id, &payload.sacrament_id]).await.map_err(internal_error)?;
+    Ok(StatusCode::CREATED)
+}
+
+// Handler for `DELETE /api/confirmands/:confirmandId/sacraments/:sacramentId`
+pub async fn remove_sacrament_from_participant(
+    State(state): State<AppState>,
+    Path((confirmand_id, sacrament_id)): Path<(i32, i16)>,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let conn = state.get().await.map_err(internal_error)?;
+    let sql = "DELETE FROM confirmand_sacraments WHERE confirmand_id = $1 AND sacrament_id = $2";
+    conn.execute(sql, &[&confirmand_id, &sacrament_id]).await.map_err(internal_error)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
