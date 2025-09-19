@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, FormEvent } from 'react';
-import Link from 'next/link'; // --- NEW --- Import Link
+import { useState, useEffect, FormEvent, useMemo } from 'react';
+import Link from 'next/link';
 import { ConfirmationGroup, Catechist } from '@/types';
+import SearchableDropdown from '../components/SearchableDropdown';
 
 const formatDate = (dateString: string | null) => {
   if (!dateString) return 'N/A';
@@ -19,8 +20,16 @@ export default function GroupsPage() {
   const [catechists, setCatechists] = useState<Catechist[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [module, setModule] = useState(1);
-  const [catechistId, setCatechistId] = useState<string>('');
+
+  // --- MODIFICATION: Added state for the module filter ---
+  const [filterCatechist, setFilterCatechist] = useState<{ id: number; name: string } | null>(null);
+  const [filterDay, setFilterDay] = useState('');
+  const [filterDate, setFilterDate] = useState('');
+  const [filterModule, setFilterModule] = useState(''); // New state for module filter
+
+  // Form state (unchanged)
+  const [module, setModule] = useState<string>('1');
+  const [selectedCatechist, setSelectedCatechist] = useState<{ id: number; name: string } | null>(null);
   const [dayOfWeek, setDayOfWeek] = useState('Sunday');
   const [startDate, setStartDate] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,9 +42,7 @@ export default function GroupsPage() {
           fetch('/api/catechists'),
         ]);
 
-        if (!groupsRes.ok || !catechistsRes.ok) {
-          throw new Error('Failed to fetch required data.');
-        }
+        if (!groupsRes.ok || !catechistsRes.ok) throw new Error('Failed to fetch required data.');
 
         const groupsData: ConfirmationGroup[] = await groupsRes.json();
         const catechistsData: Catechist[] = await catechistsRes.json();
@@ -51,40 +58,44 @@ export default function GroupsPage() {
     fetchData();
   }, []);
 
+  // --- MODIFICATION: Added the module filter to the logic ---
+  const filteredGroups = useMemo(() => {
+    return groups
+      .filter(group => {
+        if (filterCatechist && group.catechist_id !== filterCatechist.id) return false;
+        if (filterDay && group.day_of_the_week !== filterDay) return false;
+        if (filterDate && new Date(group.start_date) < new Date(filterDate)) return false;
+        if (filterModule && group.module !== Number(filterModule)) return false; // The new filter condition
+        return true;
+      })
+      .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+  }, [groups, filterCatechist, filterDay, filterDate, filterModule]); // Added to dependency array
+
   const handleAddGroup = async (e: FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
-
     const newGroupPayload = {
       module: Number(module),
-      catechist_id: catechistId ? Number(catechistId) : null,
+      catechist_id: selectedCatechist ? selectedCatechist.id : null,
       day_of_the_week: dayOfWeek,
       start_date: startDate,
       group_link: null,
       end_date: null,
     };
-
     try {
       const response = await fetch('/api/groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newGroupPayload),
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to add group.');
-      }
-
+      if (!response.ok) throw new Error(await response.text());
       const createdGroup: ConfirmationGroup = await response.json();
       setGroups(prev => [createdGroup, ...prev]);
-
-      setModule(1);
-      setCatechistId('');
+      setModule('1');
+      setSelectedCatechist(null);
       setDayOfWeek('Sunday');
       setStartDate('');
-
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -93,16 +104,53 @@ export default function GroupsPage() {
   };
   
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const modules = ['1', '2', '3'];
+  const catechistItems = catechists.map(c => ({ id: c.id, name: c.full_name }));
 
   return (
     <main className="container mx-auto p-4 md:p-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
         <div className="lg:col-span-2">
           <h1 className="text-3xl md:text-4xl font-bold mb-6 text-gray-800">Manage Groups</h1>
+
+          {/* --- MODIFICATION: Added the module filter UI and adjusted grid layout --- */}
+          <div className="mb-6 bg-white p-4 rounded-lg shadow-md">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <label htmlFor="filterCatechist" className="block text-sm font-medium text-gray-700">Filter by Catechist</label>
+                <SearchableDropdown 
+                  items={catechistItems}
+                  selected={filterCatechist}
+                  setSelected={setFilterCatechist}
+                  placeholder="All Catechists"
+                />
+              </div>
+              <div>
+                <label htmlFor="filterDay" className="block text-sm font-medium text-gray-700">Filter by Day</label>
+                <select id="filterDay" value={filterDay} onChange={(e) => setFilterDay(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                  <option value="">All Days</option>
+                  {days.map(day => <option key={day} value={day}>{day}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="filterModule" className="block text-sm font-medium text-gray-700">Filter by Module</label>
+                <select id="filterModule" value={filterModule} onChange={(e) => setFilterModule(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                  <option value="">All Modules</option>
+                  {modules.map(m => <option key={m} value={m}>{`Module ${m}`}</option>)}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="filterDate" className="block text-sm font-medium text-gray-700">Starts On or After</label>
+                <div className="flex items-center">
+                  <input type="date" id="filterDate" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+                  {filterDate && <button onClick={() => setFilterDate('')} className="ml-2 text-xl text-gray-500 hover:text-gray-800" title="Clear date filter">&times;</button>}
+                </div>
+              </div>
+            </div>
+          </div>
           
-          {loading && <p className="text-center text-gray-500">Loading groups...</p>}
-          {error && !loading && <p className="text-red-600 bg-red-100 p-4 rounded-md">Error: {error}</p>}
+          {loading && <p>Loading groups...</p>}
+          {error && !loading && <p>Error: {error}</p>}
           
           {!loading && (
             <div className="overflow-x-auto relative shadow-md sm:rounded-lg">
@@ -117,23 +165,26 @@ export default function GroupsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {groups.map((g) => (
+                  {filteredGroups.map((g) => (
                     <tr key={g.id} className="bg-white border-b hover:bg-gray-50">
                       <td className="py-4 px-6 font-medium text-gray-900">{g.module}</td>
                       <td className="py-4 px-6">{g.catechist_name || <span className="text-gray-400">Unassigned</span>}</td>
                       <td className="py-4 px-6">{g.day_of_the_week}</td>
                       <td className="py-4 px-6">{formatDate(g.start_date)}</td>
-                      {/* --- MODIFICATION HERE --- */}
                       <td className="py-4 px-6">
                         <Link href={`/groups/${g.id}`} className="font-medium text-indigo-600 hover:underline">
                           View & Manage
                         </Link>
                       </td>
-                      {/* --- END MODIFICATION --- */}
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {filteredGroups.length === 0 && !loading && (
+                <div className="text-center py-8 text-gray-500">
+                  No groups found matching your filters.
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -144,20 +195,22 @@ export default function GroupsPage() {
             <div className="space-y-4">
               <div>
                 <label htmlFor="module" className="block text-sm font-medium text-gray-700">Module</label>
-                <input type="number" id="module" value={module} onChange={(e) => setModule(Number(e.target.value))} required min="1" className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
-              </div>
-              <div>
-                <label htmlFor="catechist" className="block text-sm font-medium text-gray-700">Assign Catechist</label>
-                <select id="catechist" value={catechistId} onChange={(e) => setCatechistId(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
-                  <option value="">-- None --</option>
-                  {catechists.map(c => (
-                    <option key={c.id} value={c.id}>{c.full_name}</option>
-                  ))}
+                <select id="module" value={module} onChange={(e) => setModule(e.target.value)} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                  {modules.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
               <div>
+                <label htmlFor="catechist" className="block text-sm font-medium text-gray-700">Assign Catechist</label>
+                <SearchableDropdown
+                  items={catechistItems}
+                  selected={selectedCatechist}
+                  setSelected={setSelectedCatechist}
+                  placeholder="-- None --"
+                />
+              </div>
+              <div>
                 <label htmlFor="dayOfWeek" className="block text-sm font-medium text-gray-700">Meeting Day</label>
-                <select id="dayOfWeek" value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <select id="dayOfWeek" value={dayOfWeek} onChange={(e) => setDayOfWeek(e.тarget.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
                   {days.map(day => <option key={day} value={day}>{day}</option>)}
                 </select>
               </div>
@@ -174,7 +227,6 @@ export default function GroupsPage() {
             </div>
           </form>
         </div>
-
       </div>
     </main>
   );

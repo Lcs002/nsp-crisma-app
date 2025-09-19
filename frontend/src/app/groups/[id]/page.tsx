@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, FormEvent } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, FormEvent, useMemo } from 'react';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ConfirmationGroupDetails, Confirmand } from '@/types';
+import SearchableDropdown from '../../components/SearchableDropdown';
 
 const formatDate = (dateString: string | null) => {
   if (!dateString) return 'N/A';
@@ -17,33 +18,26 @@ const formatDate = (dateString: string | null) => {
 
 export default function GroupDetailPage() {
   const params = useParams();
-  const router = useRouter();
-  const groupId = params.id as string; // Assert as string for easier use
+  const groupId = params.id as string;
 
   const [groupDetails, setGroupDetails] = useState<ConfirmationGroupDetails | null>(null);
   const [allParticipants, setAllParticipants] = useState<Confirmand[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [participantToAdd, setParticipantToAdd] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [participantToAdd, setParticipantToAdd] = useState<{ id: number; name: string } | null>(null);
 
   useEffect(() => {
     if (!groupId) return;
-
     async function fetchData() {
       try {
         const [groupRes, participantsRes] = await Promise.all([
           fetch(`/api/groups/${groupId}`),
           fetch('/api/confirmands'),
         ]);
-
-        if (!groupRes.ok || !participantsRes.ok) {
-          throw new Error('Failed to fetch group details.');
-        }
-
+        if (!groupRes.ok || !participantsRes.ok) throw new Error('Failed to fetch group details.');
         const groupData: ConfirmationGroupDetails = await groupRes.json();
         const participantsData: Confirmand[] = await participantsRes.json();
-
         setGroupDetails(groupData);
         setAllParticipants(participantsData);
       } catch (err: any) {
@@ -55,6 +49,13 @@ export default function GroupDetailPage() {
     fetchData();
   }, [groupId]);
 
+  const availableParticipantItems = useMemo(() => {
+    if (!groupDetails) return [];
+    return allParticipants
+      .filter(p => !groupDetails.members.some(member => member.id === p.id))
+      .map(p => ({ id: p.id, name: p.full_name }));
+  }, [allParticipants, groupDetails]);
+
   const handleAddParticipant = async (e: FormEvent) => {
     e.preventDefault();
     if (!participantToAdd) {
@@ -62,24 +63,21 @@ export default function GroupDetailPage() {
       return;
     }
     setIsSubmitting(true);
-
     try {
       const response = await fetch(`/api/groups/${groupId}/participants`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirmand_id: Number(participantToAdd) }),
+        body: JSON.stringify({ confirmand_id: participantToAdd.id }),
       });
-
       if (!response.ok) throw new Error(await response.text());
-      
-      const addedParticipant = allParticipants.find(p => p.id === Number(participantToAdd));
+      const addedParticipant = allParticipants.find(p => p.id === participantToAdd.id);
       if (addedParticipant && groupDetails) {
         setGroupDetails({
           ...groupDetails,
           members: [...groupDetails.members, addedParticipant].sort((a,b) => a.full_name.localeCompare(b.full_name)),
         });
       }
-      setParticipantToAdd('');
+      setParticipantToAdd(null);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -87,22 +85,13 @@ export default function GroupDetailPage() {
     }
   };
 
-  // --- NEW --- Handler for Removing a Participant --- NEW ---
   const handleRemoveParticipant = async (participantId: number) => {
-    if (!window.confirm("Are you sure you want to remove this participant from the group?")) {
-        return;
-    }
-
+    if (!window.confirm("Are you sure you want to remove this participant from the group?")) return;
     try {
         const response = await fetch(`/api/groups/${groupId}/participants/${participantId}`, {
             method: 'DELETE',
         });
-
-        if (!response.ok) {
-            throw new Error(await response.text());
-        }
-
-        // Update the UI instantly by filtering the member out of the list
+        if (!response.ok) throw new Error(await response.text());
         if (groupDetails) {
             setGroupDetails({
                 ...groupDetails,
@@ -117,10 +106,6 @@ export default function GroupDetailPage() {
   if (loading) return <p className="text-center p-8">Loading group details...</p>;
   if (error) return <p className="text-center text-red-500 p-8">Error: {error}</p>;
   if (!groupDetails) return <p className="text-center p-8">Group not found.</p>;
-
-  const availableParticipants = allParticipants.filter(p => 
-    !groupDetails.members.some(member => member.id === p.id)
-  );
 
   return (
     <main className="container mx-auto p-4 md:p-8">
@@ -137,8 +122,10 @@ export default function GroupDetailPage() {
         </div>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2">
+      {/* --- MODIFICATION: The grid definition is now more flexible --- */}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-8">
+        {/* The `lg:col-span-2` is no longer needed as this is the first item in a 2-column grid */}
+        <div>
           <h2 className="text-2xl font-semibold mb-4 text-gray-800">Group Members ({groupDetails.members.length})</h2>
           <div className="overflow-x-auto relative bg-white shadow-md sm:rounded-lg">
             <table className="w-full text-sm text-left text-gray-500">
@@ -146,7 +133,7 @@ export default function GroupDetailPage() {
                 <tr>
                   <th scope="col" className="py-3 px-6">Full Name</th>
                   <th scope="col" className="py-3 px-6">Email</th>
-                  <th scope="col" className="py-3 px-6">Actions</th> {/* --- MODIFIED HEADER --- */}
+                  <th scope="col" className="py-3 px-6">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -154,7 +141,6 @@ export default function GroupDetailPage() {
                   <tr key={member.id} className="border-b hover:bg-gray-50">
                     <td className="py-4 px-6 font-medium text-gray-900">{member.full_name}</td>
                     <td className="py-4 px-6">{member.email}</td>
-                    {/* --- NEW --- Cell for the Remove button --- NEW --- */}
                     <td className="py-4 px-6">
                         <button 
                           onClick={() => handleRemoveParticipant(member.id)}
@@ -176,12 +162,12 @@ export default function GroupDetailPage() {
             <div className="space-y-4">
               <div>
                 <label htmlFor="participant" className="block text-sm font-medium text-gray-700">Select Participant</label>
-                <select id="participant" value={participantToAdd} onChange={e => setParticipantToAdd(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" required>
-                  <option value="" disabled>-- Select a participant --</option>
-                  {availableParticipants.map(p => (
-                    <option key={p.id} value={p.id}>{p.full_name}</option>
-                  ))}
-                </select>
+                <SearchableDropdown
+                  items={availableParticipantItems}
+                  selected={participantToAdd}
+                  setSelected={setParticipantToAdd}
+                  placeholder="-- Search for a participant --"
+                />
               </div>
             </div>
             <div className="mt-6">
