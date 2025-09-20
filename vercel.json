@@ -7,7 +7,24 @@
     },
     {
       "src": "frontend/package.json",
-      "use": "@vercel/next"
+      "use": "@vercel/next",
+      "config": {
+        "distDir": ".next"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "backend/api"
+    },
+    {
+      "src": "/_next/(.*)",
+      "dest": "frontend/_next/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "frontend"
     }
   ]
 }
