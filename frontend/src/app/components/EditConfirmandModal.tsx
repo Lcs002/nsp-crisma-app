@@ -58,7 +58,7 @@ export default function EditConfirmandModal({ confirmand, onClose, onConfirmandU
       onConfirmandUpdated(updatedData);
       onClose();
 
-    } catch (err: unknown) { // --- MODIFIED ---
+    } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -76,7 +76,6 @@ export default function EditConfirmandModal({ confirmand, onClose, onConfirmandU
       onClick={onClose}
     >
       <div 
-        // --- MODIFICATION: Added dark mode classes
         className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-700"
         onClick={(e) => e.stopPropagation()}
       >
@@ -131,12 +130,14 @@ export default function EditConfirmandModal({ confirmand, onClose, onConfirmandU
             <h3 className="md:col-span-2 text-lg font-medium text-gray-900 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 pb-2 mt-4">Additional Information (Optional)</h3>
 
             <div>
-              <label htmlFor="editFatherName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Father's Full Name</label>
+              {/* --- FIX IS HERE --- */}
+              <label htmlFor="editFatherName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Father&apos;s Full Name</label>
               <input type="text" id="editFatherName" value={fatherName} onChange={(e) => setFatherName(e.target.value)} 
                 className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
             </div>
             <div>
-              <label htmlFor="editMotherName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Mother's Full Name</label>
+              {/* --- FIX IS HERE --- */}
+              <label htmlFor="editMotherName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Mother&apos;s Full Name</label>
               <input type="text" id="editMotherName" value={motherName} onChange={(e) => setMotherName(e.target.value)} 
                 className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
             </div>

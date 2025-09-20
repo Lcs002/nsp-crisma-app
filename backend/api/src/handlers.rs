@@ -68,35 +68,49 @@ pub async fn update_confirmand(
     Json(payload): Json<CreateConfirmand>,
 ) -> Result<Json<Confirmand>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
-    let row = conn
-        .query_one(
-            "UPDATE confirmands 
-             SET 
-                full_name = $1, birth_date = $2, address = $3, phone_number = $4, email = $5, 
-                marital_status = CAST($6 AS VARCHAR)::marital_status_enum,
-                father_name = $7, mother_name = $8, baptism_church = $9, communion_church = $10
-             WHERE id = $11 
-             RETURNING 
-                id, full_name, email, phone_number, creation_date, marital_status::TEXT as marital_status,
-                birth_date, address, father_name, mother_name, baptism_church, communion_church
-            ",
-            &[
-                &payload.full_name,
-                &payload.birth_date,
-                &payload.address,
-                &payload.phone_number,
-                &payload.email,
-                &payload.marital_status.to_string(),
-                &payload.father_name,
-                &payload.mother_name,
-                &payload.baptism_church,
-                &payload.communion_church,
-                &id,
-            ],
-        )
-        .await
-        .map_err(internal_error)?;
-    let updated_confirmand = Confirmand::from(row);
+
+    // Step 1: Perform the UPDATE. We don't need a complex RETURNING clause.
+    let update_sql = "
+        UPDATE confirmands 
+        SET 
+           full_name = $1, birth_date = $2, address = $3, phone_number = $4, email = $5, 
+           marital_status = CAST($6 AS VARCHAR)::marital_status_enum,
+           father_name = $7, mother_name = $8, baptism_church = $9, communion_church = $10
+        WHERE id = $11
+    ";
+    let result = conn.execute(update_sql, &[
+        &payload.full_name,
+        &payload.birth_date,
+        &payload.address,
+        &payload.phone_number,
+        &payload.email,
+        &payload.marital_status.to_string(),
+        &payload.father_name,
+        &payload.mother_name,
+        &payload.baptism_church,
+        &payload.communion_church,
+        &id,
+    ]).await.map_err(internal_error)?;
+
+    if result == 0 {
+        return Err((StatusCode::NOT_FOUND, format!("Participant with ID {} not found to update", id)));
+    }
+
+    // Step 2: Fetch the complete, updated record with the JOIN to get all fields, including group info.
+    let select_sql = "
+        SELECT 
+            c.id, c.full_name, c.email, c.phone_number, c.creation_date, c.marital_status::TEXT as marital_status,
+            c.birth_date, c.address, c.father_name, c.mother_name, c.baptism_church, c.communion_church,
+            cg.id as current_group_id,
+            cg.module as current_group_module
+        FROM confirmands c
+        LEFT JOIN confirmand_confirmation_groups ccg ON c.id = ccg.confirmand_id
+        LEFT JOIN confirmation_groups cg ON ccg.confirmation_group_id = cg.id
+        WHERE c.id = $1
+    ";
+    let updated_row = conn.query_one(select_sql, &[&id]).await.map_err(internal_error)?;
+    
+    let updated_confirmand = Confirmand::from(updated_row);
     Ok(Json(updated_confirmand))
 }
 

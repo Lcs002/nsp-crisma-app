@@ -131,12 +131,14 @@ export default function AddConfirmandForm({ onConfirmandAdded }: AddConfirmandFo
         <h3 className="md:col-span-2 text-lg font-medium text-gray-900 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 pb-2 mt-4">Additional Information (Optional)</h3>
 
         <div>
-            <label htmlFor="fatherName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Father's Full Name</label>
+            {/* --- FIX IS HERE --- */}
+            <label htmlFor="fatherName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Father&apos;s Full Name</label>
             <input type="text" id="fatherName" value={fatherName} onChange={(e) => setFatherName(e.target.value)} 
               className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
         </div>
         <div>
-            <label htmlFor="motherName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Mother's Full Name</label>
+            {/* --- FIX IS HERE --- */}
+            <label htmlFor="motherName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Mother&apos;s Full Name</label>
             <input type="text" id="motherName" value={motherName} onChange={(e) => setMotherName(e.target.value)} 
               className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
         </div>
