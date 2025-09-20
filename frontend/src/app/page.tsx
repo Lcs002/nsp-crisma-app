@@ -21,11 +21,13 @@ export default function Home() {
         const data: Confirmand[] = await response.json();
         if (!Array.isArray(data)) throw new Error("Invalid data format received from server.");
         setConfirmands(data);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("An unknown error occurred while fetching participants.");
+        }
+      } 
     }
     fetchConfirmands();
   }, []);
