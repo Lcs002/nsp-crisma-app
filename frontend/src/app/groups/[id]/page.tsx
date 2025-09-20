@@ -40,8 +40,12 @@ export default function GroupDetailPage() {
         const participantsData: Confirmand[] = await participantsRes.json();
         setGroupDetails(groupData);
         setAllParticipants(participantsData);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) { // --- MODIFIED ---
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("An unknown error occurred while fetching group details.");
+        }
       } finally {
         setLoading(false);
       }
@@ -78,8 +82,12 @@ export default function GroupDetailPage() {
         });
       }
       setParticipantToAdd(null);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) { // --- MODIFIED ---
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unknown error occurred while adding the participant.");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -98,8 +106,12 @@ export default function GroupDetailPage() {
                 members: groupDetails.members.filter(member => member.id !== participantId),
             });
         }
-    } catch (err: any) {
+    } catch (err: unknown) { // --- MODIFIED ---
+      if (err instanceof Error) {
         setError(err.message);
+      } else {
+        setError("An unknown error occurred while removing the participant.");
+      }
     }
   };
 

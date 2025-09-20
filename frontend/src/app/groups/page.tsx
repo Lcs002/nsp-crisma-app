@@ -47,8 +47,12 @@ export default function GroupsPage() {
         
         setGroups(groupsData);
         setCatechists(catechistsData);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) { // --- MODIFIED ---
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("An unknown error occurred while fetching group data.");
+        }
       } finally {
         setLoading(false);
       }
@@ -93,8 +97,12 @@ export default function GroupsPage() {
       setSelectedCatechist(null);
       setDayOfWeek('Sunday');
       setStartDate('');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) { // --- MODIFIED ---
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unknown error occurred while adding the group.");
+      }
     } finally {
       setIsSubmitting(false);
     }

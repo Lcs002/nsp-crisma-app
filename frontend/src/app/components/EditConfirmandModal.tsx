@@ -58,8 +58,12 @@ export default function EditConfirmandModal({ confirmand, onClose, onConfirmandU
       onConfirmandUpdated(updatedData);
       onClose();
 
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) { // --- MODIFIED ---
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unknown error occurred while updating the participant.");
+      }
     } 
     finally {
       setIsSubmitting(false);

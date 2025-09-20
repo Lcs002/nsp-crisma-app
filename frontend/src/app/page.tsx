@@ -60,8 +60,12 @@ export default function Home() {
         throw new Error(errorText || 'Failed to delete participant.');
       }
       setConfirmands((prev) => prev.filter((c) => c.id !== id));
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) { // --- MODIFIED ---
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unknown error occurred while deleting the participant.");
+      }
     }
   };
 

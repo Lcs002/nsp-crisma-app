@@ -33,8 +33,12 @@ export default function ParticipantDetailPage() {
 
         setDetails(detailsData);
         setAllSacraments(allSacramentsData);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) { // --- MODIFIED ---
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("An unknown error occurred while fetching participant details.");
+        }
       } finally {
         setLoading(false);
       }
@@ -72,7 +76,7 @@ export default function ParticipantDetailPage() {
         });
       }
       if (!response.ok) throw new Error('Failed to update sacrament status.');
-    } catch (err: any) {
+    } catch (err: unknown) { // --- MODIFIED ---
       setError('Error updating sacrament. Please refresh and try again.');
     }
   };

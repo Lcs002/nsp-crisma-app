@@ -22,8 +22,12 @@ export default function CatechistsPage() {
         }
         const data: Catechist[] = await response.json();
         setCatechists(data);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err: unknown) { // --- MODIFIED ---
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("An unknown error occurred while fetching catechists.");
+        }
       } finally {
         setLoading(false);
       }
@@ -69,8 +73,12 @@ export default function CatechistsPage() {
       setFullName('');
       setIsActive(true);
 
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) { // --- MODIFIED ---
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("An unknown error occurred while adding the catechist.");
+      }
     } finally {
       setIsSubmitting(false);
     }

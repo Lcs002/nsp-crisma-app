@@ -24,9 +24,16 @@ export default function CatechistDetailPage() {
         }
         const data: CatechistDetails = await response.json();
         setDetails(data);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
+      // --- THIS IS THE FIX ---
+      } catch (err: unknown) { // Use `unknown` instead of `any`
+        if (err instanceof Error) {
+          setError(err.message); // Safely access .message after checking
+        } else {
+          setError("An unknown error occurred.");
+        }
+      } 
+      // --- END FIX ---
+      finally {
         setLoading(false);
       }
     }
