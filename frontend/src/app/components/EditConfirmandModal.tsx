@@ -58,11 +58,9 @@ export default function EditConfirmandModal({ confirmand, onClose, onConfirmandU
       onConfirmandUpdated(updatedData);
       onClose();
 
-    // --- THIS IS THE CORRECTED BLOCK ---
     } catch (err: any) {
       setError(err.message);
     } 
-    // --- END CORRECTION ---
     finally {
       setIsSubmitting(false);
     }
@@ -74,42 +72,49 @@ export default function EditConfirmandModal({ confirmand, onClose, onConfirmandU
       onClick={onClose}
     >
       <div 
-        className="bg-white p-6 md:p-8 rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        // --- MODIFICATION: Added dark mode classes
+        className="bg-white dark:bg-gray-800 p-6 md:p-8 rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-gray-700"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-semibold text-gray-800">Edit Participant</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-800 text-2xl">&times;</button>
+          <h2 className="text-2xl font-semibold text-gray-800 dark:text-gray-100">Edit Participant</h2>
+          <button onClick={onClose} className="text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 text-2xl">&times;</button>
         </div>
         
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             
-            <h3 className="md:col-span-2 text-lg font-medium text-gray-900 border-b pb-2">Personal Information</h3>
+            <h3 className="md:col-span-2 text-lg font-medium text-gray-900 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 pb-2">Personal Information</h3>
             
             <div>
-              <label htmlFor="editFullName" className="block text-sm font-medium text-gray-700">Full Name</label>
-              <input type="text" id="editFullName" value={fullName} onChange={(e) => setFullName(e.target.value)} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+              <label htmlFor="editFullName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Full Name</label>
+              <input type="text" id="editFullName" value={fullName} onChange={(e) => setFullName(e.target.value)} required 
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
             </div>
             <div>
-              <label htmlFor="editBirthDate" className="block text-sm font-medium text-gray-700">Birth Date</label>
-              <input type="date" id="editBirthDate" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+              <label htmlFor="editBirthDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Birth Date</label>
+              <input type="date" id="editBirthDate" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} required 
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
             </div>
             <div className="md:col-span-2">
-              <label htmlFor="editAddress" className="block text-sm font-medium text-gray-700">Address</label>
-              <input type="text" id="editAddress" value={address} onChange={(e) => setAddress(e.target.value)} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+              <label htmlFor="editAddress" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Address</label>
+              <input type="text" id="editAddress" value={address} onChange={(e) => setAddress(e.target.value)} required 
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
             </div>
             <div>
-              <label htmlFor="editEmail" className="block text-sm font-medium text-gray-700">Email Address</label>
-              <input type="email" id="editEmail" value={email} onChange={(e) => setEmail(e.target.value)} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+              <label htmlFor="editEmail" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Email Address</label>
+              <input type="email" id="editEmail" value={email} onChange={(e) => setEmail(e.target.value)} required 
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
             </div>
             <div>
-              <label htmlFor="editPhone" className="block text-sm font-medium text-gray-700">Phone Number</label>
-              <input type="tel" id="editPhone" value={phone} onChange={(e) => setPhone(e.target.value)} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+              <label htmlFor="editPhone" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Phone Number</label>
+              <input type="tel" id="editPhone" value={phone} onChange={(e) => setPhone(e.target.value)} required 
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
             </div>
             <div>
-              <label htmlFor="editMaritalStatus" className="block text-sm font-medium text-gray-700">Marital Status</label>
-              <select id="editMaritalStatus" value={maritalStatus} onChange={(e) => setMaritalStatus(e.target.value)} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+              <label htmlFor="editMaritalStatus" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Marital Status</label>
+              <select id="editMaritalStatus" value={maritalStatus} onChange={(e) => setMaritalStatus(e.target.value)} required 
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                 <option value="Single">Single</option>
                 <option value="Married - Church">Married - Church</option>
                 <option value="Married - Civil">Married - Civil</option>
@@ -119,33 +124,41 @@ export default function EditConfirmandModal({ confirmand, onClose, onConfirmandU
               </select>
             </div>
 
-            <h3 className="md:col-span-2 text-lg font-medium text-gray-900 border-b pb-2 mt-4">Additional Information (Optional)</h3>
+            <h3 className="md:col-span-2 text-lg font-medium text-gray-900 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 pb-2 mt-4">Additional Information (Optional)</h3>
 
             <div>
-              <label htmlFor="editFatherName" className="block text-sm font-medium text-gray-700">Father's Full Name</label>
-              <input type="text" id="editFatherName" value={fatherName} onChange={(e) => setFatherName(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+              <label htmlFor="editFatherName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Father's Full Name</label>
+              <input type="text" id="editFatherName" value={fatherName} onChange={(e) => setFatherName(e.target.value)} 
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
             </div>
             <div>
-              <label htmlFor="editMotherName" className="block text-sm font-medium text-gray-700">Mother's Full Name</label>
-              <input type="text" id="editMotherName" value={motherName} onChange={(e) => setMotherName(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+              <label htmlFor="editMotherName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Mother's Full Name</label>
+              <input type="text" id="editMotherName" value={motherName} onChange={(e) => setMotherName(e.target.value)} 
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
             </div>
             <div>
-              <label htmlFor="editBaptismChurch" className="block text-sm font-medium text-gray-700">Church of Baptism</label>
-              <input type="text" id="editBaptismChurch" value={baptismChurch} onChange={(e) => setBaptismChurch(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+              <label htmlFor="editBaptismChurch" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Church of Baptism</label>
+              <input type="text" id="editBaptismChurch" value={baptismChurch} onChange={(e) => setBaptismChurch(e.target.value)} 
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
             </div>
             <div>
-              <label htmlFor="editCommunionChurch" className="block text-sm font-medium text-gray-700">Church of First Communion</label>
-              <input type="text" id="editCommunionChurch" value={communionChurch} onChange={(e) => setCommunionChurch(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+              <label htmlFor="editCommunionChurch" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Church of First Communion</label>
+              <input type="text" id="editCommunionChurch" value={communionChurch} onChange={(e) => setCommunionChurch(e.target.value)} 
+                className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
             </div>
           </div>
 
           {error && <p className="text-red-600 mt-4 text-sm">{error}</p>}
           
           <div className="mt-8 flex justify-end gap-4">
-            <button type="button" onClick={onClose} className="py-2 px-4 border border-gray-300 bg-white rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50">
+            <button type="button" onClick={onClose} 
+              className="py-2 px-4 border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-700 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            >
               Cancel
             </button>
-            <button type="submit" disabled={isSubmitting} className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400">
+            <button type="submit" disabled={isSubmitting} 
+              className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400 dark:disabled:bg-gray-600"
+            >
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </button>
           </div>

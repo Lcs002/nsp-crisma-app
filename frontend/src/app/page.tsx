@@ -41,7 +41,6 @@ export default function Home() {
       .sort((a, b) => a.full_name.localeCompare(b.full_name));
   }, [confirmands, searchQuery]);
 
-
   const handleConfirmandAdded = (newConfirmand: Confirmand) => {
     setConfirmands((prev) => [...prev, newConfirmand]);
   };
@@ -68,12 +67,13 @@ export default function Home() {
 
   return (
     <main className="container mx-auto p-4 md:p-8">
-      <h1 className="text-3xl md:text-4xl font-bold mb-6 text-gray-800">Confirmation Participants</h1>
+      <h1 className="text-3xl md:text-4xl font-bold mb-6 text-gray-800 dark:text-gray-100">Confirmation Participants</h1>
       
       <AddConfirmandForm onConfirmandAdded={handleConfirmandAdded} />
 
-      <div className="my-6 bg-white p-4 rounded-lg shadow-md">
-        <label htmlFor="search" className="block text-sm font-medium text-gray-700">
+      {/* --- MODIFICATION: Added dark mode classes to the search section --- */}
+      <div className="my-6 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
+        <label htmlFor="search" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
           Search by Name
         </label>
         <input
@@ -82,38 +82,37 @@ export default function Home() {
           placeholder="Enter a name to search..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="mt-1 block w-full md:w-1/2 rounded-md border-gray-300 shadow-sm"
+          className="mt-1 block w-full md:w-1/2 rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
         />
       </div>
 
-      {loading && <p className="text-center text-gray-500">Loading participants...</p>}
-      {error && <p className="text-red-600 bg-red-100 p-4 rounded-md my-4">Error: {error}</p>}
+      {loading && <p className="text-center text-gray-500 dark:text-gray-400">Loading participants...</p>}
+      {error && <p className="text-red-500 bg-red-100 dark:bg-red-900/20 dark:text-red-400 p-4 rounded-md my-4">Error: {error}</p>}
 
       {!loading && (
-        <div className="overflow-x-auto relative shadow-md sm:rounded-lg">
-          <table className="w-full text-sm text-left text-gray-500">
-            <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+        // --- MODIFICATION: Added dark mode classes to the table and its container ---
+        <div className="overflow-x-auto relative shadow-md sm:rounded-lg border border-gray-200 dark:border-gray-700">
+          <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+            <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-700/50">
               <tr>
                 <th scope="col" className="py-3 px-6">Full Name</th>
                 <th scope="col" className="py-3 px-6">Email</th>
-                {/* --- MODIFICATION --- Added "Current Group" header */}
                 <th scope="col" className="py-3 px-6">Current Group</th>
                 <th scope="col" className="py-3 px-6">Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredConfirmands.map((c) => (
-                <tr key={c.id} className="bg-white border-b hover:bg-gray-50">
-                  <td className="py-4 px-6 font-medium text-gray-900 whitespace-nowrap">
-                    <Link href={`/participants/${c.id}`} className="hover:underline text-indigo-700">
+                <tr key={c.id} className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <td className="py-4 px-6 font-medium text-gray-900 dark:text-white whitespace-nowrap">
+                    <Link href={`/participants/${c.id}`} className="hover:underline text-indigo-600 dark:text-indigo-400">
                       {c.full_name}
                     </Link>
                   </td>
                   <td className="py-4 px-6">{c.email}</td>
-                  {/* --- MODIFICATION --- Added cell to display group link */}
                   <td className="py-4 px-6">
                     {c.current_group_id ? (
-                      <Link href={`/groups/${c.current_group_id}`} className="font-medium text-indigo-600 hover:underline">
+                      <Link href={`/groups/${c.current_group_id}`} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
                         Module {c.current_group_module}
                       </Link>
                     ) : (
@@ -121,10 +120,10 @@ export default function Home() {
                     )}
                   </td>
                   <td className="py-4 px-6 flex gap-4">
-                    <button onClick={() => setEditingConfirmand(c)} className="font-medium text-indigo-600 hover:underline">
+                    <button onClick={() => setEditingConfirmand(c)} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
                       Edit
                     </button>
-                    <button onClick={() => handleDelete(c.id)} className="font-medium text-red-600 hover:underline">
+                    <button onClick={() => handleDelete(c.id)} className="font-medium text-red-600 dark:text-red-400 hover:underline">
                       Delete
                     </button>
                   </td>
@@ -133,7 +132,7 @@ export default function Home() {
             </tbody>
           </table>
           {filteredConfirmands.length === 0 && !loading && (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
               No participants found matching your search.
             </div>
           )}

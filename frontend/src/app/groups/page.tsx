@@ -21,13 +21,11 @@ export default function GroupsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // --- MODIFICATION: Added state for the module filter ---
   const [filterCatechist, setFilterCatechist] = useState<{ id: number; name: string } | null>(null);
   const [filterDay, setFilterDay] = useState('');
   const [filterDate, setFilterDate] = useState('');
-  const [filterModule, setFilterModule] = useState(''); // New state for module filter
+  const [filterModule, setFilterModule] = useState('');
 
-  // Form state (unchanged)
   const [module, setModule] = useState<string>('1');
   const [selectedCatechist, setSelectedCatechist] = useState<{ id: number; name: string } | null>(null);
   const [dayOfWeek, setDayOfWeek] = useState('Sunday');
@@ -58,18 +56,17 @@ export default function GroupsPage() {
     fetchData();
   }, []);
 
-  // --- MODIFICATION: Added the module filter to the logic ---
   const filteredGroups = useMemo(() => {
     return groups
       .filter(group => {
         if (filterCatechist && group.catechist_id !== filterCatechist.id) return false;
         if (filterDay && group.day_of_the_week !== filterDay) return false;
         if (filterDate && new Date(group.start_date) < new Date(filterDate)) return false;
-        if (filterModule && group.module !== Number(filterModule)) return false; // The new filter condition
+        if (filterModule && group.module !== Number(filterModule)) return false;
         return true;
       })
       .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
-  }, [groups, filterCatechist, filterDay, filterDate, filterModule]); // Added to dependency array
+  }, [groups, filterCatechist, filterDay, filterDate, filterModule]);
 
   const handleAddGroup = async (e: FormEvent) => {
     e.preventDefault();
@@ -111,13 +108,12 @@ export default function GroupsPage() {
     <main className="container mx-auto p-4 md:p-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2">
-          <h1 className="text-3xl md:text-4xl font-bold mb-6 text-gray-800">Manage Groups</h1>
+          <h1 className="text-3xl md:text-4xl font-bold mb-6 text-gray-800 dark:text-gray-100">Manage Groups</h1>
 
-          {/* --- MODIFICATION: Added the module filter UI and adjusted grid layout --- */}
-          <div className="mb-6 bg-white p-4 rounded-lg shadow-md">
+          <div className="mb-6 bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
-                <label htmlFor="filterCatechist" className="block text-sm font-medium text-gray-700">Filter by Catechist</label>
+                <label htmlFor="filterCatechist" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Catechist</label>
                 <SearchableDropdown 
                   items={catechistItems}
                   selected={filterCatechist}
@@ -126,36 +122,39 @@ export default function GroupsPage() {
                 />
               </div>
               <div>
-                <label htmlFor="filterDay" className="block text-sm font-medium text-gray-700">Filter by Day</label>
-                <select id="filterDay" value={filterDay} onChange={(e) => setFilterDay(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <label htmlFor="filterDay" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Day</label>
+                <select id="filterDay" value={filterDay} onChange={(e) => setFilterDay(e.target.value)} 
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                   <option value="">All Days</option>
                   {days.map(day => <option key={day} value={day}>{day}</option>)}
                 </select>
               </div>
               <div>
-                <label htmlFor="filterModule" className="block text-sm font-medium text-gray-700">Filter by Module</label>
-                <select id="filterModule" value={filterModule} onChange={(e) => setFilterModule(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <label htmlFor="filterModule" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Module</label>
+                <select id="filterModule" value={filterModule} onChange={(e) => setFilterModule(e.target.value)} 
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                   <option value="">All Modules</option>
                   {modules.map(m => <option key={m} value={m}>{`Module ${m}`}</option>)}
                 </select>
               </div>
               <div>
-                <label htmlFor="filterDate" className="block text-sm font-medium text-gray-700">Starts On or After</label>
+                <label htmlFor="filterDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Starts On or After</label>
                 <div className="flex items-center">
-                  <input type="date" id="filterDate" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
-                  {filterDate && <button onClick={() => setFilterDate('')} className="ml-2 text-xl text-gray-500 hover:text-gray-800" title="Clear date filter">&times;</button>}
+                  <input type="date" id="filterDate" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} 
+                    className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                  {filterDate && <button onClick={() => setFilterDate('')} className="ml-2 text-xl text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200" title="Clear date filter">&times;</button>}
                 </div>
               </div>
             </div>
           </div>
           
-          {loading && <p>Loading groups...</p>}
-          {error && !loading && <p>Error: {error}</p>}
+          {loading && <p className="text-center text-gray-500 dark:text-gray-400">Loading groups...</p>}
+          {error && !loading && <p className="text-red-600 bg-red-100 dark:bg-red-900/20 dark:text-red-400 p-4 rounded-md">Error: {error}</p>}
           
           {!loading && (
-            <div className="overflow-x-auto relative shadow-md sm:rounded-lg">
-              <table className="w-full text-sm text-left text-gray-500">
-                <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+            <div className="overflow-x-auto relative shadow-md sm:rounded-lg border border-gray-200 dark:border-gray-700">
+              <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+                <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-700/50">
                   <tr>
                     <th scope="col" className="py-3 px-6">Module</th>
                     <th scope="col" className="py-3 px-6">Catechist</th>
@@ -166,13 +165,13 @@ export default function GroupsPage() {
                 </thead>
                 <tbody>
                   {filteredGroups.map((g) => (
-                    <tr key={g.id} className="bg-white border-b hover:bg-gray-50">
-                      <td className="py-4 px-6 font-medium text-gray-900">{g.module}</td>
+                    <tr key={g.id} className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="py-4 px-6 font-medium text-gray-900 dark:text-white">{g.module}</td>
                       <td className="py-4 px-6">{g.catechist_name || <span className="text-gray-400">Unassigned</span>}</td>
                       <td className="py-4 px-6">{g.day_of_the_week}</td>
                       <td className="py-4 px-6">{formatDate(g.start_date)}</td>
                       <td className="py-4 px-6">
-                        <Link href={`/groups/${g.id}`} className="font-medium text-indigo-600 hover:underline">
+                        <Link href={`/groups/${g.id}`} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
                           View & Manage
                         </Link>
                       </td>
@@ -181,7 +180,7 @@ export default function GroupsPage() {
                 </tbody>
               </table>
               {filteredGroups.length === 0 && !loading && (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-800">
                   No groups found matching your filters.
                 </div>
               )}
@@ -190,17 +189,18 @@ export default function GroupsPage() {
         </div>
 
         <div>
-          <form onSubmit={handleAddGroup} className="p-6 bg-white rounded-lg shadow-md sticky top-8">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-800">Add New Group</h2>
+          <form onSubmit={handleAddGroup} className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md sticky top-8 border border-gray-200 dark:border-gray-700">
+            <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Add New Group</h2>
             <div className="space-y-4">
               <div>
-                <label htmlFor="module" className="block text-sm font-medium text-gray-700">Module</label>
-                <select id="module" value={module} onChange={(e) => setModule(e.target.value)} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <label htmlFor="module" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Module</label>
+                <select id="module" value={module} onChange={(e) => setModule(e.target.value)} required 
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                   {modules.map(m => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
               <div>
-                <label htmlFor="catechist" className="block text-sm font-medium text-gray-700">Assign Catechist</label>
+                <label htmlFor="catechist" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Assign Catechist</label>
                 <SearchableDropdown
                   items={catechistItems}
                   selected={selectedCatechist}
@@ -209,19 +209,22 @@ export default function GroupsPage() {
                 />
               </div>
               <div>
-                <label htmlFor="dayOfWeek" className="block text-sm font-medium text-gray-700">Meeting Day</label>
-                <select id="dayOfWeek" value={dayOfWeek} onChange={(e) => setDayOfWeek(e.тarget.value)} className="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                <label htmlFor="dayOfWeek" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Meeting Day</label>
+                <select id="dayOfWeek" value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value)} 
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                   {days.map(day => <option key={day} value={day}>{day}</option>)}
                 </select>
               </div>
               <div>
-                <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">Start Date</label>
-                <input type="date" id="startDate" value={startDate} onChange={(e) => setStartDate(e.target.value)} required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm" />
+                <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Start Date</label>
+                <input type="date" id="startDate" value={startDate} onChange={(e) => setStartDate(e.target.value)} required 
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
               </div>
             </div>
             {error && <p className="text-red-600 mt-4 text-sm">{error}</p>}
             <div className="mt-6">
-              <button type="submit" disabled={isSubmitting} className="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400">
+              <button type="submit" disabled={isSubmitting} 
+                className="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400 dark:disabled:bg-gray-600">
                 {isSubmitting ? 'Adding...' : 'Add Group'}
               </button>
             </div>

@@ -103,33 +103,33 @@ export default function GroupDetailPage() {
     }
   };
 
-  if (loading) return <p className="text-center p-8">Loading group details...</p>;
+  if (loading) return <p className="text-center p-8 text-gray-500 dark:text-gray-400">Loading group details...</p>;
   if (error) return <p className="text-center text-red-500 p-8">Error: {error}</p>;
-  if (!groupDetails) return <p className="text-center p-8">Group not found.</p>;
+  if (!groupDetails) return <p className="text-center p-8 text-gray-500 dark:text-gray-400">Group not found.</p>;
 
   return (
     <main className="container mx-auto p-4 md:p-8">
       <div className="mb-6">
-        <Link href="/groups" className="text-indigo-600 hover:underline">&larr; Back to All Groups</Link>
+        <Link href="/groups" className="text-indigo-600 dark:text-indigo-400 hover:underline">&larr; Back to All Groups</Link>
       </div>
 
-      <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Module {groupDetails.module}</h1>
-        <div className="mt-2 text-gray-600 grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* --- MODIFICATION: Added dark mode classes to the header card --- */}
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8 border border-gray-200 dark:border-gray-700">
+        <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Module {groupDetails.module}</h1>
+        <div className="mt-2 text-gray-600 dark:text-gray-300 grid grid-cols-2 md:grid-cols-4 gap-4">
           <div><strong>Catechist:</strong> {groupDetails.catechist_name || 'Unassigned'}</div>
           <div><strong>Meeting Day:</strong> {groupDetails.day_of_the_week}</div>
           <div><strong>Start Date:</strong> {formatDate(groupDetails.start_date)}</div>
         </div>
       </div>
       
-      {/* --- MODIFICATION: The grid definition is now more flexible --- */}
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-8">
-        {/* The `lg:col-span-2` is no longer needed as this is the first item in a 2-column grid */}
         <div>
-          <h2 className="text-2xl font-semibold mb-4 text-gray-800">Group Members ({groupDetails.members.length})</h2>
-          <div className="overflow-x-auto relative bg-white shadow-md sm:rounded-lg">
-            <table className="w-full text-sm text-left text-gray-500">
-              <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+          <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Group Members ({groupDetails.members.length})</h2>
+          {/* --- MODIFICATION: Added dark mode classes to the table container --- */}
+          <div className="overflow-x-auto relative bg-white dark:bg-gray-800 shadow-md sm:rounded-lg border border-gray-200 dark:border-gray-700">
+            <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
+              <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-700/50">
                 <tr>
                   <th scope="col" className="py-3 px-6">Full Name</th>
                   <th scope="col" className="py-3 px-6">Email</th>
@@ -138,13 +138,13 @@ export default function GroupDetailPage() {
               </thead>
               <tbody>
                 {groupDetails.members.map(member => (
-                  <tr key={member.id} className="border-b hover:bg-gray-50">
-                    <td className="py-4 px-6 font-medium text-gray-900">{member.full_name}</td>
+                  <tr key={member.id} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="py-4 px-6 font-medium text-gray-900 dark:text-white">{member.full_name}</td>
                     <td className="py-4 px-6">{member.email}</td>
                     <td className="py-4 px-6">
                         <button 
                           onClick={() => handleRemoveParticipant(member.id)}
-                          className="font-medium text-red-600 hover:underline"
+                          className="font-medium text-red-600 dark:text-red-400 hover:underline"
                         >
                             Remove
                         </button>
@@ -157,11 +157,12 @@ export default function GroupDetailPage() {
         </div>
 
         <div>
-          <form onSubmit={handleAddParticipant} className="p-6 bg-white rounded-lg shadow-md sticky top-8">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-800">Add Participant</h2>
+          {/* --- MODIFICATION: Added dark mode classes to the form --- */}
+          <form onSubmit={handleAddParticipant} className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-md sticky top-8 border border-gray-200 dark:border-gray-700">
+            <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Add Participant</h2>
             <div className="space-y-4">
               <div>
-                <label htmlFor="participant" className="block text-sm font-medium text-gray-700">Select Participant</label>
+                <label htmlFor="participant" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Select Participant</label>
                 <SearchableDropdown
                   items={availableParticipantItems}
                   selected={participantToAdd}
@@ -171,7 +172,8 @@ export default function GroupDetailPage() {
               </div>
             </div>
             <div className="mt-6">
-              <button type="submit" disabled={isSubmitting} className="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400">
+              <button type="submit" disabled={isSubmitting} 
+                className="w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400 dark:disabled:bg-gray-600">
                 {isSubmitting ? 'Adding...' : 'Add to Group'}
               </button>
             </div>
