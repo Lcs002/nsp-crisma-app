@@ -1,9 +1,8 @@
-import { ClerkProvider } from '@clerk/nextjs';
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Header from './components/Header';
+import { Providers } from "./providers"; // --- NEW: Import our client-side provider
 import "./globals.css";
-import getConfig from 'next/config'; // --- NEW: Import getConfig
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -12,27 +11,23 @@ export const metadata: Metadata = {
   description: "Centralized information for crisma participants and groups",
 };
 
-// --- NEW: Get the public runtime config ---
-const { publicRuntimeConfig } = getConfig();
-
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    // --- THIS IS THE FIX ---
-    // We pass the key explicitly from the runtime config.
-    // The `publishableKey` prop DOES exist, the `secretKey` one did not.
-    <ClerkProvider
-      publishableKey={publicRuntimeConfig.clerkPublishableKey}
-    >
-      <html lang="en">
-        <body className={`${inter.className}`}>
+    // The <html> tag is now the outermost element
+    <html lang="en">
+      <body className={`${inter.className}`}>
+        {/* The Providers component wraps the content INSIDE the body */}
+        <Providers>
           <Header />
-          {children}
-        </body>
-      </html>
-    </ClerkProvider>
+          <main className="container mx-auto p-4 md:p-8">
+            {children}
+          </main>
+        </Providers>
+      </body>
+    </html>
   );
 }

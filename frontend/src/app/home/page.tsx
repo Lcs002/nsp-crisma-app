@@ -50,7 +50,7 @@ export default function HomePage() {
   }, [api]);
 
   return (
-    <main className="container mx-auto p-4 md:p-8">
+    <div>
       <h1 className="text-3xl md:text-4xl font-bold text-gray-800 dark:text-gray-100">
         Welcome, {user?.firstName || 'User'}!
       </h1>
@@ -74,6 +74,6 @@ export default function HomePage() {
             <NavCard href="/groups" title="Groups" description="Create new groups and manage their members." />
         </div>
       </div>
-    </main>
+    </div>
   );
 }
