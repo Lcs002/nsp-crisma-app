@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from 'react';
 import { Confirmand } from '@/types';
+import { useApiClient } from '@/lib/useApiClient';
 
 interface EditConfirmandModalProps {
   confirmand: Confirmand;
@@ -10,6 +11,7 @@ interface EditConfirmandModalProps {
 }
 
 export default function EditConfirmandModal({ confirmand, onClose, onConfirmandUpdated }: EditConfirmandModalProps) {
+  const api = useApiClient();
   const [fullName, setFullName] = useState(confirmand.full_name);
   const [email, setEmail] = useState(confirmand.email);
   const [phone, setPhone] = useState(confirmand.phone_number);
@@ -26,6 +28,7 @@ export default function EditConfirmandModal({ confirmand, onClose, onConfirmandU
   
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!api) return;
     setIsSubmitting(true);
     setError(null);
 
@@ -43,18 +46,7 @@ export default function EditConfirmandModal({ confirmand, onClose, onConfirmandU
     };
 
     try {
-      const response = await fetch(`/api/confirmands/${confirmand.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedPayload),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to update participant.');
-      }
-
-      const updatedData: Confirmand = await response.json();
+      const updatedData = await api.put<Confirmand>(`/api/confirmands/${confirmand.id}`, updatedPayload);
       onConfirmandUpdated(updatedData);
       onClose();
 

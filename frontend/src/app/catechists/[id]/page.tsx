@@ -4,25 +4,22 @@ import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { CatechistDetails } from '@/types';
+import { useApiClient } from '@/lib/useApiClient';
 
 export default function CatechistDetailPage() {
   const params = useParams();
   const catechistId = params.id as string;
-
+  const api = useApiClient();
   const [details, setDetails] = useState<CatechistDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!catechistId) return;
+    if (!catechistId || !api) return;
 
     async function fetchData() {
       try {
-        const response = await fetch(`/api/catechists/${catechistId}/details`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch catechist details.');
-        }
-        const data: CatechistDetails = await response.json();
+        const data = await api.get<CatechistDetails>(`/api/catechists/${catechistId}/details`);
         setDetails(data);
       // --- THIS IS THE FIX ---
       } catch (err: unknown) { // Use `unknown` instead of `any`
@@ -38,7 +35,7 @@ export default function CatechistDetailPage() {
       }
     }
     fetchData();
-  }, [catechistId]);
+  }, [catechistId, api]);
 
   if (loading) return <p className="text-center p-8 text-gray-500 dark:text-gray-400">Loading catechist details...</p>;
   if (error) return <p className="text-center text-red-500 p-8">Error: {error}</p>;

@@ -1,21 +1,23 @@
-use axum::{extract::{Path, State}, http::StatusCode, Json};
-use crate::{models::{GroupSummary, Confirmand, CreateConfirmand, Catechist, CreateCatechist, CatechistDetails, ConfirmationGroup, CreateConfirmationGroup, AddParticipantToGroup, ConfirmationGroupDetails, Sacrament, ConfirmandDetails, UpdateParticipantSacrament}, AppState};
+use axum::{extract::{Path, State}, http::StatusCode, Json, body::Body, BoxError};
+use crate::{models::{GroupSummary, DashboardStats, MaritalStatus, Confirmand, CreateConfirmand, Catechist, CreateCatechist, CatechistDetails, ConfirmationGroup, CreateConfirmationGroup, AddParticipantToGroup, ConfirmationGroupDetails, Sacrament, ConfirmandDetails, UpdateParticipantSacrament}, AppState};
+use csv::ReaderBuilder; // --- NEW ---
+use std::io::Cursor; // --- NEW ---
+use chrono::NaiveDate;
+use crate::auth::{self, AdminUser};
+use serde_json::json; // --- NEW ---
 
 // MODIFIED: The SELECT query now LEFT JOINs to find the current group for each participant.
-pub async fn list_confirmands(
-    State(state): State<AppState>,
-) -> Result<Json<Vec<Confirmand>>, (StatusCode, String)> {
+pub async fn list_confirmands(_: AdminUser, State(state): State<AppState>) -> Result<Json<Vec<Confirmand>>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
-    
-    // This query now uses DISTINCT ON to ensure one unique row per participant,
-    // ordering by the group link's creation date if a participant were in multiple groups
-    // to pick the most recent one. For now, it just guarantees uniqueness.
+
+    // --- MODIFICATION: The SQL query now also selects the group's start_date ---
     let sql = "
         SELECT DISTINCT ON (c.id)
             c.id, c.full_name, c.email, c.phone_number, c.creation_date, c.marital_status::TEXT as marital_status,
             c.birth_date, c.address, c.father_name, c.mother_name, c.baptism_church, c.communion_church,
             cg.id as current_group_id,
-            cg.module as current_group_module
+            cg.module as current_group_module,
+            cg.start_date as current_group_start_date -- Added this line
         FROM confirmands c
         LEFT JOIN confirmand_confirmation_groups ccg ON c.id = ccg.confirmand_id
         LEFT JOIN confirmation_groups cg ON ccg.confirmation_group_id = cg.id
@@ -23,24 +25,18 @@ pub async fn list_confirmands(
     ";
 
     let rows = conn.query(sql, &[]).await.map_err(internal_error)?;
-    
-    // The rest of the function is the same
     let confirmands: Vec<Confirmand> = rows.into_iter().map(Confirmand::from).collect();
-    
-    // Add a debug print to see what we're about to send
-    println!("[DEBUG] Found {} confirmands to send to frontend.", confirmands.len());
-
     Ok(Json(confirmands))
 }
-
 // MODIFICATION: The INSERT and RETURNING statements now include all columns.
 pub async fn create_confirmand(
+    _: AdminUser,
     State(state): State<AppState>,
     Json(payload): Json<CreateConfirmand>,
 ) -> Result<(StatusCode, Json<Confirmand>), (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
 
-    // Step 1: Insert the new record and only return its ID.
+    // Step 1: Insert the new record and return its ID. This part is correct.
     let insert_sql = "
         INSERT INTO confirmands (
             full_name, birth_date, address, phone_number, email, marital_status, 
@@ -67,17 +63,18 @@ pub async fn create_confirmand(
         )
         .await
         .map_err(internal_error)?;
-
+    
     let new_id: i32 = row.get(0);
 
-    // Step 2: Fetch the complete, newly created record with the JOIN to get all fields.
-    // This query is identical to the one in `list_confirmands`.
+    // Step 2: Fetch the complete, newly created record.
+    // THIS QUERY IS NOW CORRECTED to match the one in `list_confirmands`.
     let select_sql = "
         SELECT 
             c.id, c.full_name, c.email, c.phone_number, c.creation_date, c.marital_status::TEXT as marital_status,
             c.birth_date, c.address, c.father_name, c.mother_name, c.baptism_church, c.communion_church,
             cg.id as current_group_id,
-            cg.module as current_group_module
+            cg.module as current_group_module,
+            cg.start_date as current_group_start_date -- This was the missing line
         FROM confirmands c
         LEFT JOIN confirmand_confirmation_groups ccg ON c.id = ccg.confirmand_id
         LEFT JOIN confirmation_groups cg ON ccg.confirmation_group_id = cg.id
@@ -90,6 +87,7 @@ pub async fn create_confirmand(
 }
 
 pub async fn update_confirmand(
+    _: AdminUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
     Path(id): Path<i32>,
     Json(payload): Json<CreateConfirmand>,
@@ -142,6 +140,7 @@ pub async fn update_confirmand(
 }
 
 pub async fn delete_confirmand(
+    _: AdminUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -158,6 +157,7 @@ pub async fn delete_confirmand(
 
 // Handler for `GET /api/catechists`
 pub async fn list_catechists(
+    _: AdminUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Catechist>>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
@@ -191,6 +191,7 @@ pub async fn list_catechists(
 }
 
 pub async fn get_catechist_details(
+    _: AdminUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<CatechistDetails>, (StatusCode, String)> {
@@ -245,27 +246,60 @@ pub async fn get_catechist_details(
     Ok(Json(details))
 }
 
-
-
 // Handler for `POST /api/catechists`
 pub async fn create_catechist(
+    user: AdminUser,
     State(state): State<AppState>,
     Json(payload): Json<CreateCatechist>,
 ) -> Result<(StatusCode, Json<Catechist>), (StatusCode, String)> {
+    println!("[CREATE CATECHIST] Auth successful for user: {}", user.id);
     let conn = state.get().await.map_err(internal_error)?;
-    let row = conn
+
+    // Step 1: Insert the new catechist and only return its new ID.
+    let insert_row = conn
         .query_one(
-            "INSERT INTO catechists (full_name, currently_active) VALUES ($1, $2) RETURNING *",
+            "INSERT INTO catechists (full_name, currently_active) VALUES ($1, $2) RETURNING id",
             &[&payload.full_name, &payload.currently_active],
         )
         .await
         .map_err(internal_error)?;
-    let new_catechist = Catechist::from(row);
+    
+    let new_id: i32 = insert_row.get(0);
+    println!("[CREATE CATECHIST] Insert successful with new ID: {}", new_id);
+
+    // Step 2: Fetch the complete, newly created record using the same advanced query from `list_catechists`.
+    // This guarantees the returned object has the correct shape, including the calculated fields.
+    let select_sql = "
+        WITH LatestGroup AS (
+            SELECT DISTINCT ON (catechist_id)
+                catechist_id,
+                id as latest_group_id,
+                module as latest_group_module,
+                start_date as latest_group_start_date
+            FROM confirmation_groups
+            WHERE catechist_id IS NOT NULL
+            ORDER BY catechist_id, start_date DESC
+        )
+        SELECT 
+            c.id, c.full_name, c.currently_active,
+            lg.latest_group_id,
+            lg.latest_group_module,
+            lg.latest_group_start_date
+        FROM catechists c
+        LEFT JOIN LatestGroup lg ON c.id = lg.catechist_id
+        WHERE c.id = $1
+    ";
+    
+    let new_catechist_row = conn.query_one(select_sql, &[&new_id]).await.map_err(internal_error)?;
+    let new_catechist = Catechist::from(new_catechist_row);
+    println!("[CREATE CATECHIST] Returning new catechist object: {:?}", new_catechist);
+
     Ok((StatusCode::CREATED, Json(new_catechist)))
 }
 
 // Handler for `GET /api/groups`
 pub async fn list_groups(
+    _: AdminUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ConfirmationGroup>>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
@@ -291,6 +325,7 @@ pub async fn list_groups(
 
 // Handler for `POST /api/groups`
 pub async fn create_group(
+    _: AdminUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
     Json(payload): Json<CreateConfirmationGroup>,
 ) -> Result<(StatusCode, Json<ConfirmationGroup>), (StatusCode, String)> {
@@ -339,6 +374,7 @@ pub async fn create_group(
 }
 
 pub async fn get_group_details(
+    _: AdminUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<ConfirmationGroupDetails>, (StatusCode, String)> {
@@ -387,30 +423,32 @@ pub async fn get_group_details(
 
 // --- NEW --- Handler for `POST /api/groups/:id/participants`
 pub async fn add_participant_to_group(
+    _: AdminUser,
     State(state): State<AppState>,
     Path(group_id): Path<i32>,
     Json(payload): Json<AddParticipantToGroup>,
-) -> Result<(StatusCode, String), (StatusCode, String)> {
+) -> Result<(StatusCode, Json<serde_json::Value>), (StatusCode, String)> { // Return type is now Json<Value>
     let conn = state.get().await.map_err(internal_error)?;
 
     let sql = "
         INSERT INTO confirmand_confirmation_groups (confirmand_id, confirmation_group_id)
         VALUES ($1, $2)
         ON CONFLICT (confirmand_id, confirmation_group_id) DO NOTHING
-    "; // ON CONFLICT prevents crashes if the user is already in the group
+    ";
 
     let result = conn.execute(sql, &[&payload.confirmand_id, &group_id]).await.map_err(internal_error)?;
 
     if result > 0 {
-        // We successfully added the participant
-        Ok((StatusCode::CREATED, "Participant added to group.".to_string()))
+        // Return a JSON object with a success message
+        Ok((StatusCode::CREATED, Json(json!({ "message": "Participant added to group successfully." }))))
     } else {
-        // The participant was already in the group, which is not an error
-        Ok((StatusCode::OK, "Participant already in group.".to_string()))
+        // Return a JSON object for the "already exists" case
+        Ok((StatusCode::OK, Json(json!({ "message": "Participant was already in this group." }))))
     }
 }
 
 pub async fn remove_participant_from_group(
+    _: AdminUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
     Path((group_id, confirmand_id)): Path<(i32, i32)>, // Axum can extract multiple path params into a tuple
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -430,6 +468,7 @@ pub async fn remove_participant_from_group(
 
 // Handler for `GET /api/sacraments`
 pub async fn list_all_sacraments(
+    _: AdminUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Sacrament>>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
@@ -444,6 +483,7 @@ pub async fn list_all_sacraments(
 // Handler for `GET /api/confirmands/:id/details`
 // MODIFIED: This handler now also fetches the participant's entire group history.
 pub async fn get_participant_details(
+    _: AdminUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<ConfirmandDetails>, (StatusCode, String)> {
@@ -507,6 +547,7 @@ pub async fn get_participant_details(
 
 // Handler for `POST /api/confirmands/:id/sacraments`
 pub async fn add_sacrament_to_participant(
+    _: AdminUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
     Path(confirmand_id): Path<i32>,
     Json(payload): Json<UpdateParticipantSacrament>,
@@ -522,6 +563,7 @@ pub async fn add_sacrament_to_participant(
 
 // Handler for `DELETE /api/confirmands/:confirmandId/sacraments/:sacramentId`
 pub async fn remove_sacrament_from_participant(
+    _: AdminUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
     Path((confirmand_id, sacrament_id)): Path<(i32, i16)>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -529,6 +571,134 @@ pub async fn remove_sacrament_from_participant(
     let sql = "DELETE FROM confirmand_sacraments WHERE confirmand_id = $1 AND sacrament_id = $2";
     conn.execute(sql, &[&confirmand_id, &sacrament_id]).await.map_err(internal_error)?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+// ===================================================================
+// CSV Import Handler --- MODIFIED ---
+// ===================================================================
+
+pub async fn import_confirmands_from_csv(
+    _: AdminUser,
+    State(state): State<AppState>,
+    body: String,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    println!("[IMPORT] Received CSV data for import.");
+
+    let mut reader = ReaderBuilder::new()
+        .delimiter(b'\t')
+        .from_reader(Cursor::new(body));
+
+    let mut imported_emails = Vec::new();
+    let mut skipped_count = 0;
+
+    let conn = state.get().await.map_err(internal_error)?;
+
+    for result in reader.records() {
+        let record = match result {
+            Ok(rec) => rec,
+            Err(_) => { skipped_count += 1; continue; }
+        };
+
+        let email = record.get(3).unwrap_or_default().trim().to_string();
+        if email.is_empty() {
+            skipped_count += 1;
+            continue;
+        }
+
+        let full_name = record.get(1).unwrap_or_default().trim().to_string();
+        let birth_date_str = record.get(2).unwrap_or_default().trim();
+        let address = record.get(4).unwrap_or_default().trim().to_string();
+        let phone_number = record.get(5).unwrap_or_default().trim().to_string();
+        let marital_status_str = record.get(6).unwrap_or_default().trim();
+
+        let birth_date = match NaiveDate::parse_from_str(birth_date_str, "%d/%m/%Y") {
+            Ok(date) => date,
+            Err(_) => { skipped_count += 1; continue; }
+        };
+
+        let marital_status = match marital_status_str {
+            "Casado/a na Igreja" => MaritalStatus::MarriedChurch,
+            _ => MaritalStatus::Single,
+        };
+        
+        let new_participant = CreateConfirmand {
+            full_name, birth_date, address, phone_number, email, marital_status,
+            father_name: None, mother_name: None, baptism_church: None, communion_church: None,
+        };
+
+        // This query now returns the email of the inserted row.
+        // It will only return a row if the INSERT was successful (not a conflict).
+        let insert_sql = "
+            INSERT INTO confirmands (full_name, birth_date, address, phone_number, email, marital_status)
+            VALUES ($1, $2, $3, $4, $5, CAST($6 AS VARCHAR)::marital_status_enum)
+            ON CONFLICT (email) DO NOTHING
+            RETURNING email
+        ";
+        
+        let result_row = conn.query_opt(insert_sql, &[
+            &new_participant.full_name, &new_participant.birth_date, &new_participant.address,
+            &new_participant.phone_number, &new_participant.email, &new_participant.marital_status.to_string(),
+        ]).await.map_err(internal_error)?;
+        
+        if let Some(row) = result_row {
+            let imported_email: String = row.get(0);
+            imported_emails.push(imported_email);
+        }
+    }
+
+    let new_participants_count = imported_emails.len();
+    let mut imported_confirmands: Vec<Confirmand> = Vec::new();
+
+    // If we imported any users, fetch their full records to return to the frontend.
+    if !imported_emails.is_empty() {
+        let select_sql = "
+            SELECT 
+                c.id, c.full_name, c.email, c.phone_number, c.creation_date, c.marital_status::TEXT as marital_status,
+                c.birth_date, c.address, c.father_name, c.mother_name, c.baptism_church, c.communion_church,
+                cg.id as current_group_id,
+                cg.module as current_group_module,
+                cg.start_date as current_group_start_date
+            FROM confirmands c
+            LEFT JOIN confirmand_confirmation_groups ccg ON c.id = ccg.confirmand_id
+            LEFT JOIN confirmation_groups cg ON ccg.confirmation_group_id = cg.id
+            WHERE c.email = ANY($1)
+        ";
+        let rows = conn.query(select_sql, &[&imported_emails]).await.map_err(internal_error)?;
+        imported_confirmands = rows.into_iter().map(Confirmand::from).collect();
+    }
+    
+    println!("[IMPORT] Finished. Imported: {}, Skipped: {}", new_participants_count, skipped_count);
+    
+    Ok(Json(json!({
+        "status": "success",
+        "new_participants_imported": new_participants_count,
+        "rows_skipped": skipped_count,
+        "imported_records": imported_confirmands // Send the full records back
+    })))
+}
+
+pub async fn get_dashboard_stats(
+    _: AdminUser,
+    State(state): State<AppState>,
+) -> Result<Json<DashboardStats>, (StatusCode, String)> {
+    // MODIFIED: The connection is now mutable
+    let mut conn = state.get().await.map_err(internal_error)?;
+
+    let transaction = conn.transaction().await.map_err(internal_error)?;
+
+    let p_count_row = transaction.query_one("SELECT COUNT(*) FROM confirmands", &[]).await.map_err(internal_error)?;
+    let c_count_row = transaction.query_one("SELECT COUNT(*) FROM catechists WHERE currently_active = TRUE", &[]).await.map_err(internal_error)?;
+    let g_count_row = transaction.query_one("SELECT COUNT(*) FROM confirmation_groups WHERE end_date IS NULL", &[]).await.map_err(internal_error)?;
+    
+    transaction.commit().await.map_err(internal_error)?;
+
+    let stats = DashboardStats {
+        participant_count: p_count_row.get(0),
+        catechist_count: c_count_row.get(0),
+        active_group_count: g_count_row.get(0),
+    };
+
+    Ok(Json(stats))
 }
 
 fn internal_error<E>(err: E) -> (StatusCode, String)

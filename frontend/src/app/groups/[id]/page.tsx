@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ConfirmationGroupDetails, Confirmand } from '@/types';
 import SearchableDropdown from '../../components/SearchableDropdown';
+import { useApiClient } from '@/lib/useApiClient';
+import { getGroupLabel } from '@/lib/utils';
 
 const formatDate = (dateString: string | null) => {
   if (!dateString) return 'N/A';
@@ -19,6 +21,7 @@ const formatDate = (dateString: string | null) => {
 export default function GroupDetailPage() {
   const params = useParams();
   const groupId = params.id as string;
+  const api = useApiClient();
 
   const [groupDetails, setGroupDetails] = useState<ConfirmationGroupDetails | null>(null);
   const [allParticipants, setAllParticipants] = useState<Confirmand[]>([]);
@@ -28,16 +31,13 @@ export default function GroupDetailPage() {
   const [participantToAdd, setParticipantToAdd] = useState<{ id: number; name: string } | null>(null);
 
   useEffect(() => {
-    if (!groupId) return;
+    if (!groupId || !api) return;
     async function fetchData() {
       try {
-        const [groupRes, participantsRes] = await Promise.all([
-          fetch(`/api/groups/${groupId}`),
-          fetch('/api/confirmands'),
+        const [groupData, participantsData] = await Promise.all([
+          api.get<ConfirmationGroupDetails>(`/api/groups/${groupId}`),
+          api.get<Confirmand[]>('/api/confirmands'),
         ]);
-        if (!groupRes.ok || !participantsRes.ok) throw new Error('Failed to fetch group details.');
-        const groupData: ConfirmationGroupDetails = await groupRes.json();
-        const participantsData: Confirmand[] = await participantsRes.json();
         setGroupDetails(groupData);
         setAllParticipants(participantsData);
       } catch (err: unknown) {
@@ -51,7 +51,7 @@ export default function GroupDetailPage() {
       }
     }
     fetchData();
-  }, [groupId]);
+  }, [groupId, api]);
 
   const availableParticipantItems = useMemo(() => {
     if (!groupDetails) return [];
@@ -62,18 +62,13 @@ export default function GroupDetailPage() {
 
   const handleAddParticipant = async (e: FormEvent) => {
     e.preventDefault();
-    if (!participantToAdd) {
+    if (!participantToAdd || !api) {
       alert('Please select a participant to add.');
       return;
     }
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/groups/${groupId}/participants`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirmand_id: participantToAdd.id }),
-      });
-      if (!response.ok) throw new Error(await response.text());
+      await api.post(`/api/groups/${groupId}/participants`, { confirmand_id: participantToAdd.id });
       const addedParticipant = allParticipants.find(p => p.id === participantToAdd.id);
       if (addedParticipant && groupDetails) {
         setGroupDetails({
@@ -94,12 +89,9 @@ export default function GroupDetailPage() {
   };
 
   const handleRemoveParticipant = async (participantId: number) => {
-    if (!window.confirm("Are you sure you want to remove this participant from the group?")) return;
+    if (!api || !window.confirm("Are you sure you want to remove this participant from the group?")) return;
     try {
-        const response = await fetch(`/api/groups/${groupId}/participants/${participantId}`, {
-            method: 'DELETE',
-        });
-        if (!response.ok) throw new Error(await response.text());
+        await api.delete(`/api/groups/${groupId}/participants/${participantId}`);
         if (groupDetails) {
             setGroupDetails({
                 ...groupDetails,
@@ -126,7 +118,9 @@ export default function GroupDetailPage() {
       </div>
 
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md mb-8 border border-gray-200 dark:border-gray-700">
-        <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">Module {groupDetails.module}</h1>
+        <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">
+          {getGroupLabel(groupDetails.start_date)}
+        </h1>
         <div className="mt-2 text-gray-600 dark:text-gray-300 grid grid-cols-2 md:grid-cols-4 gap-4">
           <div><strong>Catechist:</strong> {groupDetails.catechist_name || 'Unassigned'}</div>
           <div><strong>Meeting Day:</strong> {groupDetails.day_of_the_week}</div>

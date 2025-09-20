@@ -23,6 +23,7 @@ export interface Confirmand {
   // --- NEW ---
   current_group_id: number | null;
   current_group_module: number | null;
+  current_group_start_date: string | null;
 }
 
 // Catechist type (unchanged)

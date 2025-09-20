@@ -1,19 +1,22 @@
 use axum::{
     routing::{delete, get, post, put},
-    Router,
+    Router,  middleware,
 };
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
 mod db;
 mod handlers;
+mod auth;
 mod models;
 
 pub type AppState = Arc<db::DBPool>;
 
 #[tokio::main]
 async fn main() {
-    dotenvy::dotenv().ok();
+    if let Err(e) = dotenvy::dotenv() {
+        println!("Could not load .env file: {}", e);
+    }
     let pool = db::create_pool().expect("Failed to create database pool");
     let app_state = Arc::new(pool);
 
@@ -22,6 +25,7 @@ async fn main() {
     // Define routes for Participants (Confirmands)
     let confirmands_routes = Router::new()
         .route("/", get(handlers::list_confirmands).post(handlers::create_confirmand))
+        .route("/import", post(handlers::import_confirmands_from_csv))
         .route("/:id", put(handlers::update_confirmand).delete(handlers::delete_confirmand))
         .route("/:id/details", get(handlers::get_participant_details))
         .route("/:id/sacraments", post(handlers::add_sacrament_to_participant))
@@ -45,12 +49,16 @@ async fn main() {
             delete(handlers::remove_participant_from_group),
         );
 
+
+
     // Combine all the routers into the main app router using `nest`
     let app = Router::new()
+        .route("/api/dashboard/stats", get(handlers::get_dashboard_stats))
         .route("/api/sacraments", get(handlers::list_all_sacraments))
         .nest("/api/confirmands", confirmands_routes)
         .nest("/api/catechists", catechists_routes)
         .nest("/api/groups", groups_routes)
+        //.layer(middleware::from_fn(auth::auth_middleware))
         .with_state(app_state);
 
     let addr = "127.0.0.1:3001";

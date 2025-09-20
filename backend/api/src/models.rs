@@ -1,13 +1,24 @@
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use tokio_postgres::Row;
-use strum::ToString;
+use strum::{Display, EnumString};
+
+// ===================================================================
+// --- NEW --- Dashboard Models --- NEW ---
+// ===================================================================
+
+#[derive(Serialize)]
+pub struct DashboardStats {
+    pub participant_count: i64,
+    pub catechist_count: i64,
+    pub active_group_count: i64,
+}
 
 // ===================================================================
 // Custom ENUM Types
 // ===================================================================
 
-#[derive(Serialize, Deserialize, Debug, ToString, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Display, EnumString, Clone, PartialEq)] // --- MODIFIED
 #[strum(serialize_all = "PascalCase")]
 #[serde(rename_all = "PascalCase")]
 pub enum MaritalStatus {
@@ -23,7 +34,7 @@ pub enum MaritalStatus {
     Widowed,
 }
 
-#[derive(Serialize, Deserialize, Debug, ToString, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Display, EnumString, Clone, PartialEq)] // --- MODIFIED
 #[strum(serialize_all = "PascalCase")]
 #[serde(rename_all = "PascalCase")]
 pub enum DayOfTheWeek {
@@ -84,6 +95,7 @@ pub struct Confirmand {
     pub creation_date: DateTime<Utc>,
     pub current_group_id: Option<i32>,
     pub current_group_module: Option<i16>,
+    pub current_group_start_date: Option<NaiveDate>
 }
 
 impl From<Row> for Confirmand {
@@ -103,6 +115,7 @@ impl From<Row> for Confirmand {
             creation_date: row.get("creation_date"),
             current_group_id: row.get("current_group_id"),
             current_group_module: row.get("current_group_module"),
+            current_group_start_date: row.get("current_group_start_date")
         }
     }
 }
@@ -117,7 +130,7 @@ pub struct CreateCatechist {
     pub currently_active: bool,
 }
 
-#[derive(Serialize, Clone)] 
+#[derive(Serialize, Clone, Debug)] // --- THIS IS THE KEY FIX ---
 pub struct Catechist {
     pub id: i32,
     pub full_name: String,

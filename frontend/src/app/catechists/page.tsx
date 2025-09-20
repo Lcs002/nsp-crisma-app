@@ -3,8 +3,10 @@
 import { useState, useEffect, FormEvent, useMemo } from 'react';
 import Link from 'next/link';
 import { Catechist } from '@/types';
+import { useApiClient } from '@/lib/useApiClient';
 
 export default function CatechistsPage() {
+  const api = useApiClient(); 
   const [catechists, setCatechists] = useState<Catechist[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -15,12 +17,9 @@ export default function CatechistsPage() {
 
   useEffect(() => {
     async function fetchCatechists() {
+      if (!api) return;
       try {
-        const response = await fetch('/api/catechists');
-        if (!response.ok) {
-          throw new Error('Failed to fetch catechists.');
-        }
-        const data: Catechist[] = await response.json();
+        const data = await api.get<Catechist[]>('/api/catechists');
         setCatechists(data);
       } catch (err: unknown) { // --- MODIFIED ---
         if (err instanceof Error) {
@@ -33,7 +32,7 @@ export default function CatechistsPage() {
       }
     }
     fetchCatechists();
-  }, []);
+  }, [api]);
 
   const filteredCatechists = useMemo(() => {
     if (!searchQuery) {
@@ -48,6 +47,7 @@ export default function CatechistsPage() {
 
   const handleAddCatechist = async (e: FormEvent) => {
     e.preventDefault();
+    if (!api) return;
     setIsSubmitting(true);
     setError(null);
 
@@ -57,18 +57,7 @@ export default function CatechistsPage() {
     };
 
     try {
-      const response = await fetch('/api/catechists', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newCatechistPayload),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to add catechist.');
-      }
-
-      const createdCatechist: Catechist = await response.json();
+      const createdCatechist = await api.post<Catechist>('/api/catechists', newCatechistPayload);
       setCatechists(prev => [...prev, createdCatechist]);
       setFullName('');
       setIsActive(true);

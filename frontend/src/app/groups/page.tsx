@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ConfirmationGroup, Catechist } from '@/types';
 import SearchableDropdown from '../components/SearchableDropdown';
 import { getGroupLabel } from '@/lib/utils';
+import { useApiClient } from '@/lib/useApiClient';
 
 const formatDate = (dateString: string | null) => {
   if (!dateString) return 'N/A';
@@ -17,6 +18,7 @@ const formatDate = (dateString: string | null) => {
 };
 
 export default function GroupsPage() {
+  const api = useApiClient();
   const [groups, setGroups] = useState<ConfirmationGroup[]>([]);
   const [catechists, setCatechists] = useState<Catechist[]>([]);
   const [loading, setLoading] = useState(true);
@@ -36,16 +38,10 @@ export default function GroupsPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [groupsRes, catechistsRes] = await Promise.all([
-          fetch('/api/groups'),
-          fetch('/api/catechists'),
+        const [groupsData, catechistsData] = await Promise.all([
+          api.get<ConfirmationGroup[]>('/api/groups'),
+          api.get<Catechist[]>('/api/catechists'),
         ]);
-
-        if (!groupsRes.ok || !catechistsRes.ok) throw new Error('Failed to fetch required data.');
-
-        const groupsData: ConfirmationGroup[] = await groupsRes.json();
-        const catechistsData: Catechist[] = await catechistsRes.json();
-        
         setGroups(groupsData);
         setCatechists(catechistsData);
       } catch (err: unknown) {
@@ -59,7 +55,7 @@ export default function GroupsPage() {
       }
     }
     fetchData();
-  }, []);
+  }, [api]);
 
   const filteredGroups = useMemo(() => {
     return groups
@@ -86,13 +82,7 @@ export default function GroupsPage() {
       end_date: null,
     };
     try {
-      const response = await fetch('/api/groups', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newGroupPayload),
-      });
-      if (!response.ok) throw new Error(await response.text());
-      const createdGroup: ConfirmationGroup = await response.json();
+      const createdGroup = await api.post<ConfirmationGroup>('/api/groups', newGroupPayload);
       setGroups(prev => [createdGroup, ...prev]);
       setSelectedCatechist(null);
       setDayOfWeek('Sunday');

@@ -2,12 +2,14 @@
 
 import { useState, FormEvent } from 'react';
 import { Confirmand } from '@/types';
+import { useApiClient } from '@/lib/useApiClient'; 
 
 interface AddConfirmandFormProps {
   onConfirmandAdded: (newConfirmand: Confirmand) => void;
 }
 
 export default function AddConfirmandForm({ onConfirmandAdded }: AddConfirmandFormProps) {
+  const api = useApiClient();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -24,6 +26,7 @@ export default function AddConfirmandForm({ onConfirmandAdded }: AddConfirmandFo
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!api) return;
     setIsSubmitting(true);
     setError(null);
 
@@ -41,18 +44,7 @@ export default function AddConfirmandForm({ onConfirmandAdded }: AddConfirmandFo
     };
 
     try {
-      const response = await fetch('/api/confirmands', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newConfirmandPayload),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Failed to add participant.');
-      }
-
-      const createdConfirmand: Confirmand = await response.json();
+      const createdConfirmand = await api.post<Confirmand>('/api/confirmands', newConfirmandPayload);
       onConfirmandAdded(createdConfirmand);
 
       setFullName('');
