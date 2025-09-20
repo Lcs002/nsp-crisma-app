@@ -37,6 +37,18 @@ pub enum DayOfTheWeek {
 }
 
 // ===================================================================
+// --- NEW --- Group Summary Model --- NEW ---
+// ===================================================================
+
+// A lightweight summary of a group for display in lists
+#[derive(Serialize, Clone, Debug)]
+pub struct GroupSummary {
+    pub id: i32,
+    pub module: i16,
+    pub catechist_name: Option<String>,
+}
+
+// ===================================================================
 // Confirmand Models --- MODIFIED ---
 // ===================================================================
 
@@ -70,9 +82,10 @@ pub struct Confirmand {
     pub baptism_church: Option<String>,
     pub communion_church: Option<String>,
     pub creation_date: DateTime<Utc>,
+    pub current_group_id: Option<i32>,
+    pub current_group_module: Option<i16>,
 }
 
-// The `From<Row>` implementation is updated to get all the new fields.
 impl From<Row> for Confirmand {
     fn from(row: Row) -> Self {
         Self {
@@ -88,6 +101,8 @@ impl From<Row> for Confirmand {
             baptism_church: row.get("baptism_church"),
             communion_church: row.get("communion_church"),
             creation_date: row.get("creation_date"),
+            current_group_id: row.get("current_group_id"),
+            current_group_module: row.get("current_group_module"),
         }
     }
 }
@@ -102,11 +117,14 @@ pub struct CreateCatechist {
     pub currently_active: bool,
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)] 
 pub struct Catechist {
     pub id: i32,
     pub full_name: String,
     pub currently_active: bool,
+    pub latest_group_id: Option<i32>,
+    pub latest_group_module: Option<i16>,
+    pub latest_group_start_date: Option<NaiveDate>,
 }
 
 impl From<Row> for Catechist {
@@ -115,8 +133,19 @@ impl From<Row> for Catechist {
             id: row.get("id"),
             full_name: row.get("full_name"),
             currently_active: row.get("currently_active"),
+            // --- NEW ---
+            latest_group_id: row.get("latest_group_id"),
+            latest_group_module: row.get("latest_group_module"),
+            latest_group_start_date: row.get("latest_group_start_date"),
         }
     }
+}
+
+#[derive(Serialize)]
+pub struct CatechistDetails {
+    #[serde(flatten)]
+    pub catechist: Catechist,
+    pub group_history: Vec<GroupSummary>,
 }
 
 // ===================================================================
@@ -204,4 +233,5 @@ pub struct ConfirmandDetails {
     #[serde(flatten)]
     pub confirmand: Confirmand,
     pub sacraments: Vec<Sacrament>,
+    pub group_history: Vec<GroupSummary>,
 }

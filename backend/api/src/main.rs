@@ -35,6 +35,7 @@ async fn main() {
         // Catechist Routes
         .route("/api/catechists", get(handlers::list_catechists))
         .route("/api/catechists", post(handlers::create_catechist))
+        .route("/api/catechists/:id/details", get(handlers::get_catechist_details))
         
         // Group Routes
         .route("/api/groups", get(handlers::list_groups))

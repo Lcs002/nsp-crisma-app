@@ -1,18 +1,26 @@
 use axum::{extract::{Path, State}, http::StatusCode, Json};
-use crate::{models::{Confirmand, CreateConfirmand, Catechist, CreateCatechist, ConfirmationGroup, CreateConfirmationGroup, AddParticipantToGroup, ConfirmationGroupDetails, Sacrament, ConfirmandDetails, UpdateParticipantSacrament}, AppState};
+use crate::{models::{GroupSummary, Confirmand, CreateConfirmand, Catechist, CreateCatechist, CatechistDetails, ConfirmationGroup, CreateConfirmationGroup, AddParticipantToGroup, ConfirmationGroupDetails, Sacrament, ConfirmandDetails, UpdateParticipantSacrament}, AppState};
 
-// MODIFICATION: The SELECT query now fetches all columns.
+// MODIFIED: The SELECT query now LEFT JOINs to find the current group for each participant.
 pub async fn list_confirmands(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Confirmand>>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
     let sql = "
         SELECT 
-            id, full_name, email, phone_number, creation_date, marital_status::TEXT as marital_status,
-            birth_date, address, father_name, mother_name, baptism_church, communion_church
-        FROM confirmands 
-        ORDER BY full_name
+            c.id, c.full_name, c.email, c.phone_number, c.creation_date, c.marital_status::TEXT as marital_status,
+            c.birth_date, c.address, c.father_name, c.mother_name, c.baptism_church, c.communion_church,
+            cg.id as current_group_id,
+            cg.module as current_group_module
+        FROM confirmands c
+        LEFT JOIN confirmand_confirmation_groups ccg ON c.id = ccg.confirmand_id
+        LEFT JOIN confirmation_groups cg ON ccg.confirmation_group_id = cg.id
+        ORDER BY c.full_name
     ";
+    // NOTE: This assumes a participant is only in one group at a time. If they can be in multiple,
+    // this query would need to be more complex (e.g., using DISTINCT ON or filtering for an "active" group).
+    // For now, this works for the "one group at a time" rule.
+
     let rows = conn.query(sql, &[]).await.map_err(internal_error)?;
     let confirmands: Vec<Confirmand> = rows.into_iter().map(Confirmand::from).collect();
     Ok(Json(confirmands))
@@ -112,13 +120,84 @@ pub async fn list_catechists(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Catechist>>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
-    let rows = conn
-        .query("SELECT id, full_name, currently_active FROM catechists ORDER BY full_name", &[])
-        .await
-        .map_err(internal_error)?;
+    
+    // This query uses a Common Table Expression (CTE) with DISTINCT ON to find the most recent
+    // group for each catechist based on the start_date.
+    let sql = "
+        WITH LatestGroup AS (
+            SELECT DISTINCT ON (catechist_id)
+                catechist_id,
+                id as latest_group_id,
+                module as latest_group_module,
+                start_date as latest_group_start_date
+            FROM confirmation_groups
+            WHERE catechist_id IS NOT NULL
+            ORDER BY catechist_id, start_date DESC
+        )
+        SELECT 
+            c.id, c.full_name, c.currently_active,
+            lg.latest_group_id,
+            lg.latest_group_module,
+            lg.latest_group_start_date
+        FROM catechists c
+        LEFT JOIN LatestGroup lg ON c.id = lg.catechist_id
+        ORDER BY c.full_name
+    ";
+
+    let rows = conn.query(sql, &[]).await.map_err(internal_error)?;
     let catechists: Vec<Catechist> = rows.into_iter().map(Catechist::from).collect();
     Ok(Json(catechists))
 }
+
+pub async fn get_catechist_details(
+    State(state): State<AppState>,
+    Path(id): Path<i32>,
+) -> Result<Json<CatechistDetails>, (StatusCode, String)> {
+    let conn = state.get().await.map_err(internal_error)?;
+
+    // Step 1: Get the main catechist info (using the same advanced query as the list)
+    let catechist_sql = "
+        WITH LatestGroup AS (
+            SELECT DISTINCT ON (catechist_id)
+                catechist_id, id as latest_group_id, module as latest_group_module, start_date as latest_group_start_date
+            FROM confirmation_groups
+            WHERE catechist_id IS NOT NULL
+            ORDER BY catechist_id, start_date DESC
+        )
+        SELECT 
+            c.id, c.full_name, c.currently_active,
+            lg.latest_group_id, lg.latest_group_module, lg.latest_group_start_date
+        FROM catechists c
+        LEFT JOIN LatestGroup lg ON c.id = lg.catechist_id
+        WHERE c.id = $1
+    ";
+    let catechist_row = conn.query_one(catechist_sql, &[&id]).await.map_err(internal_error)?;
+    let catechist = Catechist::from(catechist_row);
+
+    // Step 2: Get their entire group history
+    let history_sql = "
+        SELECT 
+            cg.id, cg.module, c.full_name as catechist_name
+        FROM confirmation_groups cg
+        LEFT JOIN catechists c ON cg.catechist_id = c.id
+        WHERE cg.catechist_id = $1
+        ORDER BY cg.start_date DESC
+    ";
+    let history_rows = conn.query(history_sql, &[&id]).await.map_err(internal_error)?;
+    let group_history: Vec<GroupSummary> = history_rows.into_iter().map(|row| GroupSummary {
+        id: row.get("id"),
+        module: row.get("module"),
+        catechist_name: row.get("catechist_name"),
+    }).collect();
+
+    // Step 3: Combine into the final response model
+    let details = CatechistDetails {
+        catechist,
+        group_history,
+    };
+    Ok(Json(details))
+}
+
 
 // Handler for `POST /api/catechists`
 pub async fn create_catechist(
@@ -217,7 +296,7 @@ pub async fn get_group_details(
 ) -> Result<Json<ConfirmationGroupDetails>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
 
-    // Step 1: Fetch the main group details
+    // Step 1: Fetch the main group details (this part is correct)
     let group_sql = "
         SELECT 
             cg.id, cg.module, cg.start_date,
@@ -229,27 +308,30 @@ pub async fn get_group_details(
     ";
     let group_row = conn.query_one(group_sql, &[&id]).await.map_err(internal_error)?;
 
-    // Step 2: Fetch the list of members in this group
+    // Step 2: Fetch the list of members in this group - THE QUERY IS UPDATED
     let members_sql = "
         SELECT 
-            c.id, c.full_name, c.email, c.phone_number, c.creation_date, 
-            c.marital_status::TEXT as marital_status
+            c.id, c.full_name, c.email, c.phone_number, c.creation_date, c.marital_status::TEXT as marital_status,
+            c.birth_date, c.address, c.father_name, c.mother_name, c.baptism_church, c.communion_church,
+            cg.id as current_group_id,
+            cg.module as current_group_module
         FROM confirmands c
         INNER JOIN confirmand_confirmation_groups ccg ON c.id = ccg.confirmand_id
+        LEFT JOIN confirmation_groups cg ON ccg.confirmation_group_id = cg.id
         WHERE ccg.confirmation_group_id = $1
         ORDER BY c.full_name
     ";
     let member_rows = conn.query(members_sql, &[&id]).await.map_err(internal_error)?;
     let members: Vec<Confirmand> = member_rows.into_iter().map(Confirmand::from).collect();
 
-    // Step 3: Combine the data into our response model
+    // Step 3: Combine the data into our response model (this part is correct)
     let group_details = ConfirmationGroupDetails {
         id: group_row.get("id"),
         module: group_row.get("module"),
         catechist_name: group_row.get("catechist_name"),
         day_of_the_week: group_row.get("day_of_the_week"),
         start_date: group_row.get("start_date"),
-        members, // Add the list of members here
+        members,
     };
 
     Ok(Json(group_details))
@@ -312,22 +394,29 @@ pub async fn list_all_sacraments(
 }
 
 // Handler for `GET /api/confirmands/:id/details`
+// MODIFIED: This handler now also fetches the participant's entire group history.
 pub async fn get_participant_details(
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<ConfirmandDetails>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
 
+    // Step 1: Get the main participant info (including current group from the same JOIN as list_confirmands)
     let confirmand_sql = "
         SELECT 
-            id, full_name, email, phone_number, creation_date, marital_status::TEXT as marital_status,
-            birth_date, address, father_name, mother_name, baptism_church, communion_church
-        FROM confirmands 
-        WHERE id = $1
+            c.id, c.full_name, c.email, c.phone_number, c.creation_date, c.marital_status::TEXT as marital_status,
+            c.birth_date, c.address, c.father_name, c.mother_name, c.baptism_church, c.communion_church,
+            cg.id as current_group_id,
+            cg.module as current_group_module
+        FROM confirmands c
+        LEFT JOIN confirmand_confirmation_groups ccg ON c.id = ccg.confirmand_id
+        LEFT JOIN confirmation_groups cg ON ccg.confirmation_group_id = cg.id
+        WHERE c.id = $1
     ";
     let confirmand_row = conn.query_one(confirmand_sql, &[&id]).await.map_err(internal_error)?;
     let confirmand = Confirmand::from(confirmand_row);
 
+    // Step 2: Get their completed sacraments (unchanged)
     let sacraments_sql = "
         SELECT s.id, s.name 
         FROM sacraments s
@@ -338,9 +427,30 @@ pub async fn get_participant_details(
     let sacrament_rows = conn.query(sacraments_sql, &[&id]).await.map_err(internal_error)?;
     let sacraments: Vec<Sacrament> = sacrament_rows.into_iter().map(Sacrament::from).collect();
 
+    // --- NEW --- Step 3: Get their entire group history --- NEW ---
+    let history_sql = "
+        SELECT 
+            cg.id, 
+            cg.module,
+            c.full_name as catechist_name
+        FROM confirmation_groups cg
+        INNER JOIN confirmand_confirmation_groups ccg ON cg.id = ccg.confirmation_group_id
+        LEFT JOIN catechists c ON cg.catechist_id = c.id
+        WHERE ccg.confirmand_id = $1
+        ORDER BY cg.start_date DESC
+    ";
+    let history_rows = conn.query(history_sql, &[&id]).await.map_err(internal_error)?;
+    let group_history: Vec<GroupSummary> = history_rows.into_iter().map(|row| GroupSummary {
+        id: row.get("id"),
+        module: row.get("module"),
+        catechist_name: row.get("catechist_name"),
+    }).collect();
+
+    // Step 4: Combine into the final response model
     let details = ConfirmandDetails {
         confirmand,
         sacraments,
+        group_history,
     };
     Ok(Json(details))
 }

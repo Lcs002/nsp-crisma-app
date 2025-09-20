@@ -1,16 +1,14 @@
 'use client';
 
-import { useState, useEffect, FormEvent, useMemo } from 'react'; // --- NEW: Import useMemo ---
+import { useState, useEffect, FormEvent, useMemo } from 'react';
+import Link from 'next/link';
 import { Catechist } from '@/types';
 
 export default function CatechistsPage() {
   const [catechists, setCatechists] = useState<Catechist[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // --- NEW --- State for the search query --- NEW ---
   const [searchQuery, setSearchQuery] = useState('');
-  
   const [fullName, setFullName] = useState('');
   const [isActive, setIsActive] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -23,7 +21,7 @@ export default function CatechistsPage() {
           throw new Error('Failed to fetch catechists.');
         }
         const data: Catechist[] = await response.json();
-        setCatechists(data); // Set the full list; sorting is handled by useMemo
+        setCatechists(data);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -33,7 +31,6 @@ export default function CatechistsPage() {
     fetchCatechists();
   }, []);
 
-  // --- NEW --- Create a filtered and sorted list based on the search query --- NEW ---
   const filteredCatechists = useMemo(() => {
     if (!searchQuery) {
       return [...catechists].sort((a, b) => a.full_name.localeCompare(b.full_name));
@@ -44,7 +41,6 @@ export default function CatechistsPage() {
       )
       .sort((a, b) => a.full_name.localeCompare(b.full_name));
   }, [catechists, searchQuery]);
-
 
   const handleAddCatechist = async (e: FormEvent) => {
     e.preventDefault();
@@ -83,11 +79,9 @@ export default function CatechistsPage() {
   return (
     <main className="container mx-auto p-4 md:p-8">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
         <div className="lg:col-span-2">
           <h1 className="text-3xl md:text-4xl font-bold mb-6 text-gray-800">Manage Catechists</h1>
           
-          {/* --- NEW --- Search Bar Section --- NEW --- */}
           <div className="mb-6 bg-white p-4 rounded-lg shadow-md">
             <label htmlFor="search" className="block text-sm font-medium text-gray-700">
               Search by Name
@@ -101,7 +95,6 @@ export default function CatechistsPage() {
               className="mt-1 block w-full md:w-1/2 rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
             />
           </div>
-          {/* --- END NEW --- */}
 
           {loading && <p className="text-center text-gray-500">Loading catechists...</p>}
           {error && !loading && <p className="text-red-600 bg-red-100 p-4 rounded-md">Error: {error}</p>}
@@ -113,18 +106,31 @@ export default function CatechistsPage() {
                   <tr>
                     <th scope="col" className="py-3 px-6">Full Name</th>
                     <th scope="col" className="py-3 px-6">Status</th>
+                    <th scope="col" className="py-3 px-6">Latest Group</th>
                     <th scope="col" className="py-3 px-6">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {/* --- MODIFICATION: Map over the `filteredCatechists` list --- */}
                   {filteredCatechists.map((c) => (
                     <tr key={c.id} className="bg-white border-b hover:bg-gray-50">
-                      <td className="py-4 px-6 font-medium text-gray-900 whitespace-nowrap">{c.full_name}</td>
+                      <td className="py-4 px-6 font-medium text-gray-900 whitespace-nowrap">
+                        <Link href={`/catechists/${c.id}`} className="hover:underline text-indigo-700">
+                          {c.full_name}
+                        </Link>
+                      </td>
                       <td className="py-4 px-6">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${c.currently_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                           {c.currently_active ? 'Active' : 'Inactive'}
                         </span>
+                      </td>
+                      <td className="py-4 px-6">
+                        {c.latest_group_id ? (
+                          <Link href={`/groups/${c.latest_group_id}`} className="font-medium text-indigo-600 hover:underline">
+                            Module {c.latest_group_module}
+                          </Link>
+                        ) : (
+                          <span className="text-gray-400">N/A</span>
+                        )}
                       </td>
                       <td className="py-4 px-6 flex gap-4">
                         <button className="font-medium text-indigo-600 hover:underline disabled:text-gray-400" disabled>Edit</button>
@@ -133,7 +139,6 @@ export default function CatechistsPage() {
                   ))}
                 </tbody>
               </table>
-              {/* --- NEW: Show a message if search is empty --- */}
               {filteredCatechists.length === 0 && !loading && (
                 <div className="text-center py-8 text-gray-500">
                   No catechists found matching your search.
@@ -168,7 +173,6 @@ export default function CatechistsPage() {
             </div>
           </form>
         </div>
-
       </div>
     </main>
   );

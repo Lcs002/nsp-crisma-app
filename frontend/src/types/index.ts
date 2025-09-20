@@ -1,17 +1,27 @@
-// Participant type (for list and detail views) - NOW INCLUDES ALL FIELDS
+// --- NEW --- Group Summary Type --- NEW ---
+export interface GroupSummary {
+  id: number;
+  module: number;
+  catechist_name: string | null;
+}
+
+// Participant type - NOW INCLUDES CURRENT GROUP INFO
 export interface Confirmand {
   id: number;
   full_name: string;
-  birth_date: string; // Will be a "YYYY-MM-DD" string from the DB
+  birth_date: string;
   address: string;
   phone_number: string;
   email: string;
   marital_status: string;
-  father_name: string | null; // Nullable fields are represented this way
+  father_name: string | null;
   mother_name: string | null;
   baptism_church: string | null;
   communion_church: string | null;
-  creation_date: string; // Full ISO date string
+  creation_date: string;
+  // --- NEW ---
+  current_group_id: number | null;
+  current_group_module: number | null;
 }
 
 // Catechist type (unchanged)
@@ -19,6 +29,13 @@ export interface Catechist {
   id: number;
   full_name: string;
   currently_active: boolean;
+  latest_group_id: number | null;
+  latest_group_module: number | null;
+  latest_group_start_date: string | null; // This will be a "YYYY-MM-DD" string
+}
+
+export interface CatechistDetails extends Catechist {
+  group_history: GroupSummary[];
 }
 
 // Confirmation Group type (list view) (unchanged)
@@ -49,8 +66,8 @@ export interface Sacrament {
     name: string;
 }
 
-// Participant Detail Type - MODIFIED
-// It now implicitly has all the fields because it extends the updated Confirmand type
+// Participant Detail Type - NOW INCLUDES GROUP HISTORY
 export interface ConfirmandDetails extends Confirmand {
     sacraments: Sacrament[];
+    group_history: GroupSummary[]; // --- NEW ---
 }
