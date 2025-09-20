@@ -1,7 +1,7 @@
-import { ClerkProvider } from '@clerk/nextjs';
+import { ClerkProvider, UserButton } from '@clerk/nextjs';
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import Header from './components/Header'; // Import our new Header component
+import Header from './components/Header';
 import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -17,10 +17,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    // --- THIS IS THE FIX ---
+    // We are now explicitly passing the environment variables as props to the provider.
+    // This ensures they are available during the server-side build process.
+    <ClerkProvider
+      publishableKey={process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY}
+    >
       <html lang="en">
         <body className={`${inter.className}`}>
-          <Header /> {/* Use the Header component here */}
+          <Header />
           {children}
         </body>
       </html>
