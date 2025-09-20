@@ -4,6 +4,7 @@ import { useState, useEffect, FormEvent, useMemo } from 'react';
 import Link from 'next/link';
 import { ConfirmationGroup, Catechist } from '@/types';
 import SearchableDropdown from '../components/SearchableDropdown';
+import { getGroupLabel } from '@/lib/utils';
 
 const formatDate = (dateString: string | null) => {
   if (!dateString) return 'N/A';
@@ -47,7 +48,7 @@ export default function GroupsPage() {
         
         setGroups(groupsData);
         setCatechists(catechistsData);
-      } catch (err: unknown) { // --- MODIFIED ---
+      } catch (err: unknown) {
         if (err instanceof Error) {
           setError(err.message);
         } else {
@@ -77,7 +78,7 @@ export default function GroupsPage() {
     setIsSubmitting(true);
     setError(null);
     const newGroupPayload = {
-      module: Number(module),
+      module: 1, // Defaulting module to 1 as per business change
       catechist_id: selectedCatechist ? selectedCatechist.id : null,
       day_of_the_week: dayOfWeek,
       start_date: startDate,
@@ -93,11 +94,10 @@ export default function GroupsPage() {
       if (!response.ok) throw new Error(await response.text());
       const createdGroup: ConfirmationGroup = await response.json();
       setGroups(prev => [createdGroup, ...prev]);
-      setModule('1');
       setSelectedCatechist(null);
       setDayOfWeek('Sunday');
       setStartDate('');
-    } catch (err: unknown) { // --- MODIFIED ---
+    } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
       } else {
@@ -164,7 +164,7 @@ export default function GroupsPage() {
               <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
                 <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-700/50">
                   <tr>
-                    <th scope="col" className="py-3 px-6">Module</th>
+                    <th scope="col" className="py-3 px-6">Group</th>
                     <th scope="col" className="py-3 px-6">Catechist</th>
                     <th scope="col" className="py-3 px-6">Day</th>
                     <th scope="col" className="py-3 px-6">Start Date</th>
@@ -174,7 +174,7 @@ export default function GroupsPage() {
                 <tbody>
                   {filteredGroups.map((g) => (
                     <tr key={g.id} className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="py-4 px-6 font-medium text-gray-900 dark:text-white">{g.module}</td>
+                      <td className="py-4 px-6 font-medium text-gray-900 dark:text-white">{getGroupLabel(g.start_date)}</td>
                       <td className="py-4 px-6">{g.catechist_name || <span className="text-gray-400">Unassigned</span>}</td>
                       <td className="py-4 px-6">{g.day_of_the_week}</td>
                       <td className="py-4 px-6">{formatDate(g.start_date)}</td>
@@ -201,10 +201,16 @@ export default function GroupsPage() {
             <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Add New Group</h2>
             <div className="space-y-4">
               <div>
-                <label htmlFor="module" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Module</label>
-                <select id="module" value={module} onChange={(e) => setModule(e.target.value)} required 
+                {/* --- THIS IS THE CORRECTED LINE --- */}
+                <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Start Date</label>
+                <input type="date" id="startDate" value={startDate} onChange={(e) => setStartDate(e.target.value)} required 
+                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+              </div>
+              <div>
+                <label htmlFor="dayOfWeek" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Meeting Day</label>
+                <select id="dayOfWeek" value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value)} 
                   className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                  {modules.map(m => <option key={m} value={m}>{m}</option>)}
+                  {days.map(day => <option key={day} value={day}>{day}</option>)}
                 </select>
               </div>
               <div>
@@ -215,18 +221,6 @@ export default function GroupsPage() {
                   setSelected={setSelectedCatechist}
                   placeholder="-- None --"
                 />
-              </div>
-              <div>
-                <label htmlFor="dayOfWeek" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Meeting Day</label>
-                <select id="dayOfWeek" value={dayOfWeek} onChange={(e) => setDayOfWeek(e.target.value)} 
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                  {days.map(day => <option key={day} value={day}>{day}</option>)}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 dark:text-gray-300">Start Date</label>
-                <input type="date" id="startDate" value={startDate} onChange={(e) => setStartDate(e.target.value)} required 
-                  className="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700/50 text-gray-900 dark:text-gray-200 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
               </div>
             </div>
             {error && <p className="text-red-600 mt-4 text-sm">{error}</p>}

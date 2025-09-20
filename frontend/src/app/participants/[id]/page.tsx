@@ -4,6 +4,7 @@ import { useState, useEffect, ChangeEvent } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ConfirmandDetails, Sacrament } from '@/types';
+import { getGroupLabel } from '@/lib/utils';
 
 export default function ParticipantDetailPage() {
   const params = useParams();
@@ -33,7 +34,7 @@ export default function ParticipantDetailPage() {
 
         setDetails(detailsData);
         setAllSacraments(allSacramentsData);
-      } catch (err: unknown) { // --- MODIFIED ---
+      } catch (err: unknown) {
         if (err instanceof Error) {
           setError(err.message);
         } else {
@@ -76,7 +77,7 @@ export default function ParticipantDetailPage() {
         });
       }
       if (!response.ok) throw new Error('Failed to update sacrament status.');
-    } catch (err: unknown) { // --- MODIFIED ---
+    } catch (_err: unknown) {
       setError('Error updating sacrament. Please refresh and try again.');
     }
   };
@@ -95,7 +96,6 @@ export default function ParticipantDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
-          {/* --- MODIFICATION: Added dark mode classes to the info card --- */}
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
             <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">{details.full_name}</h1>
             
@@ -114,8 +114,8 @@ export default function ParticipantDetailPage() {
             <div className="mt-8">
               <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 pb-2">Additional Information</h2>
               <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-gray-600 dark:text-gray-300">
-                <p><strong>Father's Name:</strong> {details.father_name || <span className="text-gray-400">N/A</span>}</p>
-                <p><strong>Mother's Name:</strong> {details.mother_name || <span className="text-gray-400">N/A</span>}</p>
+                <p><strong>Father&apos;s Name:</strong> {details.father_name || <span className="text-gray-400">N/A</span>}</p>
+                <p><strong>Mother&apos;s Name:</strong> {details.mother_name || <span className="text-gray-400">N/A</span>}</p>
                 <p><strong>Church of Baptism:</strong> {details.baptism_church || <span className="text-gray-400">N/A</span>}</p>
                 <p><strong>Church of First Communion:</strong> {details.communion_church || <span className="text-gray-400">N/A</span>}</p>
               </div>
@@ -129,7 +129,7 @@ export default function ParticipantDetailPage() {
                       {details.group_history.map(group => (
                           <li key={group.id} className="border-b border-gray-200 dark:border-gray-700 pb-3">
                               <Link href={`/groups/${group.id}`} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
-                                  Module {group.module}
+                                  {getGroupLabel(group.start_date)}
                               </Link>
                               <p className="text-sm text-gray-500 dark:text-gray-400">
                                   Catechist: {group.catechist_name || 'Unassigned'}
@@ -143,7 +143,6 @@ export default function ParticipantDetailPage() {
           </div>
         </div>
 
-        {/* --- MODIFICATION: Added dark mode classes to the Sacraments card --- */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md h-fit border border-gray-200 dark:border-gray-700">
           <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Sacraments</h2>
           <fieldset className="space-y-4">

@@ -45,9 +45,9 @@ pub enum DayOfTheWeek {
 pub struct GroupSummary {
     pub id: i32,
     pub module: i16,
+    pub start_date: NaiveDate, // --- NEW ---
     pub catechist_name: Option<String>,
 }
-
 // ===================================================================
 // Confirmand Models --- MODIFIED ---
 // ===================================================================

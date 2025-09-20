@@ -196,7 +196,7 @@ pub async fn get_catechist_details(
 ) -> Result<Json<CatechistDetails>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
 
-    // Step 1: Get the main catechist info (using the same advanced query as the list)
+    // Step 1: Get the main catechist info (this query is correct)
     let catechist_sql = "
         WITH LatestGroup AS (
             SELECT DISTINCT ON (catechist_id)
@@ -216,28 +216,35 @@ pub async fn get_catechist_details(
     let catechist = Catechist::from(catechist_row);
 
     // Step 2: Get their entire group history
+    // MODIFICATION 1: Added `cg.start_date` to the SELECT statement
     let history_sql = "
         SELECT 
-            cg.id, cg.module, c.full_name as catechist_name
+            cg.id, 
+            cg.module,
+            cg.start_date,
+            c.full_name as catechist_name
         FROM confirmation_groups cg
         LEFT JOIN catechists c ON cg.catechist_id = c.id
         WHERE cg.catechist_id = $1
         ORDER BY cg.start_date DESC
     ";
     let history_rows = conn.query(history_sql, &[&id]).await.map_err(internal_error)?;
+    // MODIFICATION 2: Added `start_date` to the struct initialization
     let group_history: Vec<GroupSummary> = history_rows.into_iter().map(|row| GroupSummary {
         id: row.get("id"),
         module: row.get("module"),
+        start_date: row.get("start_date"),
         catechist_name: row.get("catechist_name"),
     }).collect();
 
-    // Step 3: Combine into the final response model
+    // Step 3: Combine into the final response model (this part is correct)
     let details = CatechistDetails {
         catechist,
         group_history,
     };
     Ok(Json(details))
 }
+
 
 
 // Handler for `POST /api/catechists`
@@ -473,6 +480,7 @@ pub async fn get_participant_details(
         SELECT 
             cg.id, 
             cg.module,
+            cg.start_date, -- Added this line
             c.full_name as catechist_name
         FROM confirmation_groups cg
         INNER JOIN confirmand_confirmation_groups ccg ON cg.id = ccg.confirmation_group_id
@@ -484,6 +492,7 @@ pub async fn get_participant_details(
     let group_history: Vec<GroupSummary> = history_rows.into_iter().map(|row| GroupSummary {
         id: row.get("id"),
         module: row.get("module"),
+        start_date: row.get("start_date"), // Added this line
         catechist_name: row.get("catechist_name"),
     }).collect();
 

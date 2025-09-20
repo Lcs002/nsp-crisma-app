@@ -2,6 +2,7 @@
 export interface GroupSummary {
   id: number;
   module: number;
+  start_date: string; // "YYYY-MM-DD"
   catechist_name: string | null;
 }
 
