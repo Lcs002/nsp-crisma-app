@@ -6,7 +6,7 @@
       "use": "vercel-rust"
     },
     {
-      "src": "frontend/next.config.ts",
+      "src": "frontend/package.json",
       "use": "@vercel/next"
     }
   ],
