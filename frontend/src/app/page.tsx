@@ -15,19 +15,45 @@ export default function Home() {
 
   useEffect(() => {
     async function fetchConfirmands() {
+      let response; // Declare response outside the try block
       try {
-        const response = await fetch('/api/confirmands');
-        if (!response.ok) throw new Error('Failed to fetch data from the server.');
-        const data: Confirmand[] = await response.json();
-        if (!Array.isArray(data)) throw new Error("Invalid data format received from server.");
+        console.log("Fetching participants...");
+        response = await fetch('/api/confirmands');
+        console.log("Response received with status:", response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Failed to fetch data from the server: ${errorText}`);
+        }
+
+        const textData = await response.text(); // Get the raw text first
+        console.log("Raw JSON response:", textData);
+        
+        if (!textData) {
+            throw new Error("Received empty response from server.");
+        }
+        
+        const data: Confirmand[] = JSON.parse(textData); // Manually parse it
+
+        if (!Array.isArray(data)) {
+            throw new Error("Invalid data format received from server (not an array).");
+        }
+
         setConfirmands(data);
+        console.log("Participants state set successfully.");
+
       } catch (err: unknown) {
+        // This will now catch JSON parsing errors too
+        console.error("An error occurred in fetchConfirmands:", err);
         if (err instanceof Error) {
           setError(err.message);
         } else {
-          setError("An unknown error occurred while fetching participants.");
+          setError("An unknown error occurred.");
         }
-      } 
+      } finally {
+        setLoading(false);
+        console.log("Finished fetch process, loading set to false.");
+      }
     }
     fetchConfirmands();
   }, []);

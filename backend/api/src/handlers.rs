@@ -6,8 +6,12 @@ pub async fn list_confirmands(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Confirmand>>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
+    
+    // This query now uses DISTINCT ON to ensure one unique row per participant,
+    // ordering by the group link's creation date if a participant were in multiple groups
+    // to pick the most recent one. For now, it just guarantees uniqueness.
     let sql = "
-        SELECT 
+        SELECT DISTINCT ON (c.id)
             c.id, c.full_name, c.email, c.phone_number, c.creation_date, c.marital_status::TEXT as marital_status,
             c.birth_date, c.address, c.father_name, c.mother_name, c.baptism_church, c.communion_church,
             cg.id as current_group_id,
@@ -15,14 +19,17 @@ pub async fn list_confirmands(
         FROM confirmands c
         LEFT JOIN confirmand_confirmation_groups ccg ON c.id = ccg.confirmand_id
         LEFT JOIN confirmation_groups cg ON ccg.confirmation_group_id = cg.id
-        ORDER BY c.full_name
+        ORDER BY c.id, cg.start_date DESC
     ";
-    // NOTE: This assumes a participant is only in one group at a time. If they can be in multiple,
-    // this query would need to be more complex (e.g., using DISTINCT ON or filtering for an "active" group).
-    // For now, this works for the "one group at a time" rule.
 
     let rows = conn.query(sql, &[]).await.map_err(internal_error)?;
+    
+    // The rest of the function is the same
     let confirmands: Vec<Confirmand> = rows.into_iter().map(Confirmand::from).collect();
+    
+    // Add a debug print to see what we're about to send
+    println!("[DEBUG] Found {} confirmands to send to frontend.", confirmands.len());
+
     Ok(Json(confirmands))
 }
 
@@ -32,17 +39,19 @@ pub async fn create_confirmand(
     Json(payload): Json<CreateConfirmand>,
 ) -> Result<(StatusCode, Json<Confirmand>), (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
+
+    // Step 1: Insert the new record and only return its ID.
+    let insert_sql = "
+        INSERT INTO confirmands (
+            full_name, birth_date, address, phone_number, email, marital_status, 
+            father_name, mother_name, baptism_church, communion_church
+        ) 
+        VALUES ($1, $2, $3, $4, $5, CAST($6 AS VARCHAR)::marital_status_enum, $7, $8, $9, $10) 
+        RETURNING id
+    ";
     let row = conn
         .query_one(
-            "INSERT INTO confirmands (
-                full_name, birth_date, address, phone_number, email, marital_status, 
-                father_name, mother_name, baptism_church, communion_church
-             ) 
-             VALUES ($1, $2, $3, $4, $5, CAST($6 AS VARCHAR)::marital_status_enum, $7, $8, $9, $10) 
-             RETURNING 
-                id, full_name, email, phone_number, creation_date, marital_status::TEXT as marital_status,
-                birth_date, address, father_name, mother_name, baptism_church, communion_church
-            ",
+            insert_sql,
             &[
                 &payload.full_name,
                 &payload.birth_date,
@@ -58,7 +67,25 @@ pub async fn create_confirmand(
         )
         .await
         .map_err(internal_error)?;
-    let new_confirmand = Confirmand::from(row);
+
+    let new_id: i32 = row.get(0);
+
+    // Step 2: Fetch the complete, newly created record with the JOIN to get all fields.
+    // This query is identical to the one in `list_confirmands`.
+    let select_sql = "
+        SELECT 
+            c.id, c.full_name, c.email, c.phone_number, c.creation_date, c.marital_status::TEXT as marital_status,
+            c.birth_date, c.address, c.father_name, c.mother_name, c.baptism_church, c.communion_church,
+            cg.id as current_group_id,
+            cg.module as current_group_module
+        FROM confirmands c
+        LEFT JOIN confirmand_confirmation_groups ccg ON c.id = ccg.confirmand_id
+        LEFT JOIN confirmation_groups cg ON ccg.confirmation_group_id = cg.id
+        WHERE c.id = $1
+    ";
+    let new_confirmand_row = conn.query_one(select_sql, &[&new_id]).await.map_err(internal_error)?;
+
+    let new_confirmand = Confirmand::from(new_confirmand_row);
     Ok((StatusCode::CREATED, Json(new_confirmand)))
 }
 
