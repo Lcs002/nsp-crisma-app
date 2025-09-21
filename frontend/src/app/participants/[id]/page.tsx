@@ -5,11 +5,11 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { ConfirmandDetails, Sacrament } from '@/types';
 import { getGroupLabel } from '@/lib/utils';
-
-export const dynamic = 'force-dynamic';
+import { useApiClient } from '@/lib/useApiClient'; // We were missing this hook call
 
 export default function ParticipantDetailPage() {
   const params = useParams();
+  const api = useApiClient(); // --- THIS IS THE KEY FIX ---
   const participantId = params.id as string;
 
   const [details, setDetails] = useState<ConfirmandDetails | null>(null);
@@ -18,21 +18,17 @@ export default function ParticipantDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!participantId) return;
+    // We check for the api client to be ready before fetching.
+    if (!participantId || !api) return;
 
     async function fetchData() {
       try {
-        const [detailsRes, allSacramentsRes] = await Promise.all([
-          fetch(`/api/confirmands/${participantId}/details`),
-          fetch('/api/sacraments'),
+        setLoading(true);
+        // --- REPLACED RAW fetch WITH api.get ---
+        const [detailsData, allSacramentsData] = await Promise.all([
+          api.get<ConfirmandDetails>(`/api/confirmands/${participantId}/details`),
+          api.get<Sacrament[]>('/api/sacraments'),
         ]);
-
-        if (!detailsRes.ok || !allSacramentsRes.ok) {
-          throw new Error('Failed to fetch participant details.');
-        }
-
-        const detailsData: ConfirmandDetails = await detailsRes.json();
-        const allSacramentsData: Sacrament[] = await allSacramentsRes.json();
 
         setDetails(detailsData);
         setAllSacraments(allSacramentsData);
@@ -47,40 +43,34 @@ export default function ParticipantDetailPage() {
       }
     }
     fetchData();
-  }, [participantId]);
+  }, [participantId, api]); // Add api to the dependency array
   
   const handleSacramentChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    if (!details) return;
+    if (!details || !api) return;
 
     const sacramentId = Number(e.target.value);
     const isChecked = e.target.checked;
     
+    // Optimistic UI update (unchanged)
     const changedSacrament = allSacraments.find(s => s.id === sacramentId);
     if (changedSacrament) {
       if (isChecked) {
-        setDetails({ ...details, sacraments: [...details.sacraments, changedSacrament] });
+        setDetails({ ...details, sacraments: [...details.sacraments, changedSacrament].sort((a,b) => a.id - b.id) });
       } else {
         setDetails({ ...details, sacraments: details.sacraments.filter(s => s.id !== sacramentId) });
       }
     }
 
     try {
-      const url = `/api/confirmands/${participantId}/sacraments`;
-      let response;
+      // --- REPLACED RAW fetch WITH api.post/delete ---
       if (isChecked) {
-        response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sacrament_id: sacramentId }),
-        });
+        await api.post(`/api/confirmands/${participantId}/sacraments`, { sacrament_id: sacramentId });
       } else {
-        response = await fetch(`${url}/${sacramentId}`, {
-          method: 'DELETE',
-        });
+        await api.delete(`/api/confirmands/${participantId}/sacraments/${sacramentId}`);
       }
-      if (!response.ok) throw new Error('Failed to update sacrament status.');
     } catch (_err: unknown) {
       setError('Error updating sacrament. Please refresh and try again.');
+      // NOTE: You could add logic here to revert the optimistic UI change.
     }
   };
 
@@ -91,16 +81,15 @@ export default function ParticipantDetailPage() {
   const completedSacraments = new Set(details.sacraments.map(s => s.id));
 
   return (
-    <main className="container mx-auto p-4 md:p-8">
+    <main>
       <div className="mb-6">
-        <Link href="/" className="text-indigo-600 dark:text-indigo-400 hover:underline">&larr; Back to All Participants</Link>
+        <Link href="/participants" className="text-indigo-600 dark:text-indigo-400 hover:underline">&larr; Back to All Participants</Link>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-8">
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
             <h1 className="text-3xl font-bold text-gray-800 dark:text-gray-100">{details.full_name}</h1>
-            
             <div className="mt-6">
               <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 pb-2">Personal Details</h2>
               <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-gray-600 dark:text-gray-300">
@@ -112,7 +101,6 @@ export default function ParticipantDetailPage() {
                 <p><strong>Registered On:</strong> {new Date(details.creation_date).toLocaleDateString()}</p>
               </div>
             </div>
-
             <div className="mt-8">
               <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 pb-2">Additional Information</h2>
               <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-gray-600 dark:text-gray-300">
@@ -123,7 +111,6 @@ export default function ParticipantDetailPage() {
               </div>
             </div>
           </div>
-
           <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md border border-gray-200 dark:border-gray-700">
               <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Group History</h2>
               {details.group_history.length > 0 ? (
@@ -144,7 +131,6 @@ export default function ParticipantDetailPage() {
               )}
           </div>
         </div>
-
         <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md h-fit border border-gray-200 dark:border-gray-700">
           <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-100">Sacraments</h2>
           <fieldset className="space-y-4">

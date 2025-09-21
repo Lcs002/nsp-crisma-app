@@ -483,19 +483,20 @@ pub async fn list_all_sacraments(
 // Handler for `GET /api/confirmands/:id/details`
 // MODIFIED: This handler now also fetches the participant's entire group history.
 pub async fn get_participant_details(
-    _: AdminUser,  // Ensure only admins can access this endpoint
+    _: AdminUser,
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<ConfirmandDetails>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
 
-    // Step 1: Get the main participant info (including current group from the same JOIN as list_confirmands)
+    // Step 1: Get the main participant info. THIS QUERY IS NOW CORRECTED.
     let confirmand_sql = "
         SELECT 
             c.id, c.full_name, c.email, c.phone_number, c.creation_date, c.marital_status::TEXT as marital_status,
             c.birth_date, c.address, c.father_name, c.mother_name, c.baptism_church, c.communion_church,
             cg.id as current_group_id,
-            cg.module as current_group_module
+            cg.module as current_group_module,
+            cg.start_date as current_group_start_date -- This was the missing column
         FROM confirmands c
         LEFT JOIN confirmand_confirmation_groups ccg ON c.id = ccg.confirmand_id
         LEFT JOIN confirmation_groups cg ON ccg.confirmation_group_id = cg.id
@@ -504,7 +505,7 @@ pub async fn get_participant_details(
     let confirmand_row = conn.query_one(confirmand_sql, &[&id]).await.map_err(internal_error)?;
     let confirmand = Confirmand::from(confirmand_row);
 
-    // Step 2: Get their completed sacraments (unchanged)
+    // Step 2: Get their completed sacraments (this was already correct)
     let sacraments_sql = "
         SELECT s.id, s.name 
         FROM sacraments s
@@ -515,12 +516,12 @@ pub async fn get_participant_details(
     let sacrament_rows = conn.query(sacraments_sql, &[&id]).await.map_err(internal_error)?;
     let sacraments: Vec<Sacrament> = sacrament_rows.into_iter().map(Sacrament::from).collect();
 
-    // --- NEW --- Step 3: Get their entire group history --- NEW ---
+    // Step 3: Get their entire group history (this was already correct)
     let history_sql = "
         SELECT 
             cg.id, 
             cg.module,
-            cg.start_date, -- Added this line
+            cg.start_date,
             c.full_name as catechist_name
         FROM confirmation_groups cg
         INNER JOIN confirmand_confirmation_groups ccg ON cg.id = ccg.confirmation_group_id
@@ -532,11 +533,11 @@ pub async fn get_participant_details(
     let group_history: Vec<GroupSummary> = history_rows.into_iter().map(|row| GroupSummary {
         id: row.get("id"),
         module: row.get("module"),
-        start_date: row.get("start_date"), // Added this line
+        start_date: row.get("start_date"),
         catechist_name: row.get("catechist_name"),
     }).collect();
 
-    // Step 4: Combine into the final response model
+    // Step 4: Combine into the final response model (this was already correct)
     let details = ConfirmandDetails {
         confirmand,
         sacraments,
