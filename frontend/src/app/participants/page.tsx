@@ -10,6 +10,8 @@ import ImportModal from '../components/ImportModal'; // Import the new modal com
 import { getGroupLabel } from '@/lib/utils';
 import { useApiClient } from '@/lib/useApiClient';
 
+export const dynamic = 'force-dynamic';
+
 export default function ParticipantsPage() {
   const { user, isLoaded } = useUser();
   const api = useApiClient();

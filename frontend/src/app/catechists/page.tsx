@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { Catechist } from '@/types';
 import { useApiClient } from '@/lib/useApiClient';
 
+export const dynamic = 'force-dynamic';
+
 export default function CatechistsPage() {
   const api = useApiClient(); 
   const [catechists, setCatechists] = useState<Catechist[]>([]);

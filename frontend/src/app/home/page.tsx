@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useUser } from '@clerk/nextjs';
 import { useApiClient } from '@/lib/useApiClient';
 
+export const dynamic = 'force-dynamic';
+
 interface DashboardStats {
   participant_count: number;
   catechist_count: number;

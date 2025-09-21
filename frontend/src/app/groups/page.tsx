@@ -7,6 +7,8 @@ import SearchableDropdown from '../components/SearchableDropdown';
 import { getGroupLabel } from '@/lib/utils';
 import { useApiClient } from '@/lib/useApiClient';
 
+export const dynamic = 'force-dynamic';
+
 const formatDate = (dateString: string | null) => {
   if (!dateString) return 'N/A';
   return new Date(dateString).toLocaleDateString('en-US', {

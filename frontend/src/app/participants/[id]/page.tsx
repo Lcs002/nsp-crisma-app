@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { ConfirmandDetails, Sacrament } from '@/types';
 import { getGroupLabel } from '@/lib/utils';
 
+export const dynamic = 'force-dynamic';
+
 export default function ParticipantDetailPage() {
   const params = useParams();
   const participantId = params.id as string;

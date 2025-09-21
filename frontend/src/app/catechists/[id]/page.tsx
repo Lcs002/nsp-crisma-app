@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { CatechistDetails } from '@/types';
 import { useApiClient } from '@/lib/useApiClient';
 
+export const dynamic = 'force-dynamic';
+
 export default function CatechistDetailPage() {
   const params = useParams();
   const catechistId = params.id as string;
