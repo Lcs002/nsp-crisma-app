@@ -64,8 +64,13 @@ async fn main() {
         //.layer(middleware::from_fn(auth::auth_middleware))
         .with_state(app_state);
 
-    let addr = "127.0.0.1:3001";
-    let listener = TcpListener::bind(addr).await.unwrap();
+    // Bind to the port provided by the platform via the `PORT` env var
+    // and listen on all interfaces so the container can accept external traffic.
+    let port: u16 = std::env::var("PORT").ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(3001);
+    let addr = format!("0.0.0.0:{}", port);
+    let listener = TcpListener::bind(&addr).await.expect(&format!("Failed to bind to {}", addr));
     println!("Backend listening on http://{}", addr);
 
     axum::serve(listener, app).await.unwrap();

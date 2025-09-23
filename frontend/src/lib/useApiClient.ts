@@ -6,7 +6,7 @@ import { useCallback, useMemo } from 'react';
 export function useApiClient() {
 
   const fetcher = useCallback(async (url: string, options: RequestInit = {}): Promise<Response> => {
-    const response = await fetch(url, { ...options });
+  const response = await fetch(url, { ...options, credentials: 'include' });
 
     if (!response.ok) {
       let errorBody;
@@ -34,6 +34,7 @@ export function useApiClient() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
+        credentials: 'include',
       });
       const text = await response.text();
       if (!text) {

@@ -28,7 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         // We use a simple `fetch` here because our `useApiClient` is a hook
         // and cannot be used at the top level of the context.
-        const response = await fetch('/api/auth/me');
+  const response = await fetch('/api/auth/me', { credentials: 'include' });
 
         if (response.ok) {
           const userData = await response.json();
@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
         // Tell the backend to clear the session cookie
-        await fetch('/api/auth/logout', { method: 'POST' });
+  await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     } catch (error) {
         console.error("Error during logout:", error);
     } finally {

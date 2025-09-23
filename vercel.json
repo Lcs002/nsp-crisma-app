@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "backend/api/",
+      "src": "backend/api/Cargo.toml",
       "use": "vercel-rust"
     },
     {
@@ -13,11 +13,11 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/backend/api"
+      "dest": "/backend/api/$1"
     },
     {
       "src": "/(.*)",
-      "dest": "frontend"
+      "dest": "/frontend/$1"
     }
   ]
 }
