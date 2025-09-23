@@ -16,9 +16,6 @@
       "dest": "/backend/api"
     },
     {
-      "handle": "filesystem"
-    },
-    {
       "src": "/(.*)",
       "dest": "/frontend"
     }
