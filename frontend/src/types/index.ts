@@ -1,3 +1,8 @@
+export interface User {
+  id: number;
+  username: string;
+}
+
 // --- NEW --- Group Summary Type --- NEW ---
 export interface GroupSummary {
   id: number;

@@ -38,3 +38,8 @@ base64 = "0.22"
 thiserror = "1.0"
 
 dotenvy_macro = "0.15"
+
+bcrypt = "0.15"
+axum-extra = { version = "0.9", features = ["cookie"] }
+
+time = "0.3"

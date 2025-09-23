@@ -2,10 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useUser } from '@clerk/nextjs';
+import { useAuth } from '../../contexts/AuthContext'; // --- Import our custom auth hook ---
 import { useApiClient } from '@/lib/useApiClient';
-
-export const dynamic = 'force-dynamic';
 
 interface DashboardStats {
   participant_count: number;
@@ -32,29 +30,39 @@ const NavCard = ({ href, title, description }: { href: string; title: string; de
 );
 
 export default function HomePage() {
-  const { user } = useUser();
+  // --- MODIFICATION: Use our custom auth hook ---
+  const { user, isLoading: isAuthLoading } = useAuth();
   const api = useApiClient();
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Separate loading for data
 
   useEffect(() => {
-    async function fetchStats() {
-      try {
-        const data = await api.get<DashboardStats>('/api/dashboard/stats');
-        setStats(data);
-      } catch (error) {
-        console.error(error);
-      } finally {
-        setLoading(false);
+    // Wait for auth to be checked and user to be present before fetching data
+    if (!isAuthLoading && user && api) {
+      async function fetchStats() {
+        try {
+          const data = await api.get<DashboardStats>('/api/dashboard/stats');
+          setStats(data);
+        } catch (error) {
+          console.error(error);
+          // Optionally set an error state here
+        } finally {
+          setLoading(false);
+        }
       }
+      fetchStats();
     }
-    fetchStats();
-  }, [api]);
+  }, [isAuthLoading, user, api]); // Depend on auth state and api client
+
+  // Show a loading screen while the AuthProvider is checking the session.
+  if (isAuthLoading) {
+    return <p className="text-center p-8 text-gray-500 dark:text-gray-400">Loading session...</p>;
+  }
 
   return (
     <div>
       <h1 className="text-3xl md:text-4xl font-bold text-gray-800 dark:text-gray-100">
-        Welcome, {user?.firstName || 'User'}!
+        Welcome, {user?.username || 'User'}!
       </h1>
       <p className="mt-2 text-lg text-gray-600 dark:text-gray-300">
         Here&apos;s a summary of your application data.

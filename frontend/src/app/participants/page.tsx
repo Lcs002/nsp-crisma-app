@@ -2,28 +2,30 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
-import { useUser } from '@clerk/nextjs';
+import { useAuth } from '../../contexts/AuthContext'; // --- Import our custom auth hook ---
 import { Confirmand } from '@/types';
 import AddConfirmandForm from '../components/AddConfirmandForm';
 import EditConfirmandModal from '../components/EditConfirmandModal';
-import ImportModal from '../components/ImportModal'; // Import the new modal component
+import ImportModal from '../components/ImportModal';
 import { getGroupLabel } from '@/lib/utils';
 import { useApiClient } from '@/lib/useApiClient';
 
-export const dynamic = 'force-dynamic';
-
 export default function ParticipantsPage() {
-  const { user, isLoaded } = useUser();
+  // --- MODIFICATION: Use our custom auth hook ---
+  // We get `user` to confirm login, and `isLoading` to prevent rendering before auth check is complete.
+  const { user, isLoading: isAuthLoading } = useAuth();
   const api = useApiClient();
 
   const [confirmands, setConfirmands] = useState<Confirmand[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // This is now for data fetching
   const [error, setError] = useState<string | null>(null);
   const [editingConfirmand, setEditingConfirmand] = useState<Confirmand | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false); // State for the new modal
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
-  const isAdmin = isLoaded && user?.publicMetadata?.role === 'admin';
+  // For now, any logged-in user is considered an admin.
+  // We can add more complex role logic later if needed.
+  const isAdmin = !!user;
 
   const fetchConfirmands = useCallback(async () => {
     if (!api) return;
@@ -46,10 +48,11 @@ export default function ParticipantsPage() {
   }, [api]);
 
   useEffect(() => {
-    if (isLoaded) {
+    // We only fetch data once the auth state is confirmed AND the user is logged in.
+    if (!isAuthLoading && user) {
       fetchConfirmands();
     }
-  }, [isLoaded, fetchConfirmands]);
+  }, [isAuthLoading, user, fetchConfirmands]);
 
   const filteredConfirmands = useMemo(() => {
     if (!searchQuery) {
@@ -97,12 +100,13 @@ export default function ParticipantsPage() {
     });
   };
 
-  if (!isLoaded) {
-    return <p className="text-center p-8 text-gray-500 dark:text-gray-400">Loading user session...</p>;
+  // Show a loading state while the AuthProvider is checking the session.
+  if (isAuthLoading) {
+    return <p className="text-center p-8 text-gray-500 dark:text-gray-400">Loading session...</p>;
   }
 
   return (
-    <main className="container mx-auto p-4 md:p-8">
+    <main>
       <h1 className="text-3xl md:text-4xl font-bold mb-6 text-gray-800 dark:text-gray-100">Confirmation Participants</h1>
       
       {isAdmin && <AddConfirmandForm onConfirmandAdded={handleConfirmandAdded} />}

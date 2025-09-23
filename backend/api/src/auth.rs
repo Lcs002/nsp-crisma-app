@@ -2,168 +2,142 @@ use axum::{
     async_trait,
     extract::{FromRequestParts, State},
     http::{request::Parts, StatusCode},
-    response::{IntoResponse, Response},
-    Json,
+    response::{IntoResponse, Response, Json},
 };
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-use jsonwebtoken::{decode, decode_header, DecodingKey, Validation};
-use once_cell::sync::Lazy;
-use reqwest::Client;
-use serde::Deserialize;
-use std::collections::HashMap;
-use std::time::Duration;
+use axum_extra::extract::cookie::{Cookie, CookieJar, SameSite};
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use crate::AppState;
-use tokio::sync::Mutex; // Using Tokio's async-aware Mutex
+use crate::{AppState, models::User};
+use chrono::{Utc, Duration};
+use bcrypt::verify;
+use time::OffsetDateTime;
 
-// --- Data Structures for JWT and JWKS Parsing ---
+// The name of the secure, HttpOnly cookie we will use to store the JWT.
+const JWT_COOKIE_NAME: &str = "crisma_auth_token";
 
-#[derive(Debug, Deserialize)]
-struct Claims {
-    iss: String,
-    sub: String,
-    #[serde(default)]
-    public_metadata: PublicMetadata,
-    sid: Option<String>,
+// --- The claims that will be stored in our JWT ---
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Claims {
+    pub sub: i32, // Subject (user_id)
+    pub exp: i64, // Expiration time (as a UNIX timestamp)
+    pub iat: i64, // Issued at time (as a UNIX timestamp)
 }
 
-#[derive(Debug, Deserialize, Default)]
-struct PublicMetadata {
-    #[serde(default)]
-    role: String,
+// --- The Extractor that Verifies the JWT from the Cookie ---
+// Any handler that has `user: AuthenticatedUser` as a parameter will be protected.
+pub struct AuthenticatedUser {
+    pub id: i32,
 }
 
-#[derive(Debug, Deserialize, Clone)]
-struct Jwks {
-    keys: Vec<Jwk>,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-struct Jwk {
-    kid: String,
-    n: String,
-    e: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct UnverifiedClaims {
-    iss: String,
-}
-
-// --- JWKS Caching and Fetching Logic ---
-
-static REQWEST_CLIENT: Lazy<Client> = Lazy::new(|| {
-    Client::builder()
-        .timeout(Duration::from_secs(5))
-        .build()
-        .expect("Failed to build reqwest client")
-});
-
-// The cache now correctly uses the async-aware Mutex from Tokio.
-static JWKS_CACHE: Lazy<Mutex<HashMap<String, Jwks>>> = Lazy::new(|| Mutex::new(HashMap::new()));
-
-async fn get_jwks(issuer: &str) -> Result<Jwks, AuthError> {
-    // We `.await` the lock, as this is now an async operation.
-    let mut cache = JWKS_CACHE.lock().await;
-    if let Some(jwks) = cache.get(issuer) {
-        return Ok(jwks.clone());
-    }
-    
-    // The lock is automatically dropped here when `cache` goes out of scope,
-    // which happens before the `.await` call below. This is safe.
-    drop(cache);
-
-    let jwks_url = format!("{}/.well-known/jwks.json", issuer);
-    println!("[AUTH DEBUG] Fetching JWKS from: {}", jwks_url);
-
-    let jwks: Jwks = REQWEST_CLIENT.get(&jwks_url).send().await?.json().await?;
-    
-    println!("[AUTH DEBUG] Successfully fetched and parsed JWKS.");
-
-    // Re-acquire the lock to update the cache.
-    let mut cache = JWKS_CACHE.lock().await;
-    cache.insert(issuer.to_string(), jwks.clone());
-
-    Ok(jwks)
-}
-
-// --- The Core Extractor ---
-
-// This struct will be extracted from requests if the user is a valid admin.
-pub struct AdminUser {
-    pub id: String,
-}
-
-// This implementation tells Axum how to create an `AdminUser` from a request.
-// It is the heart of our authentication and authorization logic.
 #[async_trait]
-impl FromRequestParts<AppState> for AdminUser {
+impl FromRequestParts<AppState> for AuthenticatedUser {
     type Rejection = AuthError;
 
     async fn from_request_parts(parts: &mut Parts, _state: &AppState) -> Result<Self, Self::Rejection> {
-        let auth_header = parts.headers.get("authorization")
-            .and_then(|header| header.to_str().ok())
-            .ok_or(AuthError::MissingToken)?;
+        // Extract the cookie from the request headers
+        let jar = CookieJar::from_headers(&parts.headers);
+        let token_cookie = jar.get(JWT_COOKIE_NAME).ok_or(AuthError::MissingToken)?;
+        let token = token_cookie.value();
+        
+        // Get the JWT secret from environment variables
+        let jwt_secret = std::env::var("JWT_SECRET").map_err(|_| AuthError::Internal)?;
+        let decoding_key = DecodingKey::from_secret(jwt_secret.as_bytes());
 
-        let token = auth_header.strip_prefix("Bearer ").ok_or(AuthError::InvalidToken)?;
+        // Decode and validate the token. `jsonwebtoken` checks the `exp` claim automatically.
+        let decoded = decode::<Claims>(token, &decoding_key, &Validation::default())?;
 
-        let header = decode_header(token)?;
-        let kid = header.kid.ok_or(AuthError::InvalidToken)?;
-
-        // Manually decode the token's payload to get the issuer without verification
-        let token_parts: Vec<&str> = token.split('.').collect();
-        let payload = token_parts.get(1).ok_or(AuthError::InvalidToken)?;
-        let decoded_payload = URL_SAFE_NO_PAD.decode(payload)?;
-        let unverified_claims: UnverifiedClaims = serde_json::from_slice(&decoded_payload)?;
-        let issuer = &unverified_claims.iss;
-
-        // Fetch the public keys for verification
-        let jwks = get_jwks(issuer).await?;
-        let jwk = jwks.keys.iter().find(|k| k.kid == kid).ok_or(AuthError::InvalidToken)?;
-
-        // Decode and validate the token
-        let decoding_key = DecodingKey::from_rsa_components(&jwk.n, &jwk.e)?;
-        let mut validation = Validation::new(jsonwebtoken::Algorithm::RS256);
-        validation.set_issuer(&[issuer]);
-
-        println!("{:?}", token);
-
-        let decoded_token = decode::<Claims>(token, &decoding_key, &validation)?;
-
-        println!("[AUTH DEBUG] Decoded Token Claims: {:?}", decoded_token.claims);
-
-        // --- Authorization Check ---
-        if decoded_token.claims.public_metadata.role != "admin" {
-            // Log what was actually received for easier debugging in the future
-            eprintln!("[AUTH FORBIDDEN] User '{}' attempted access with role: '{}'", decoded_token.claims.sub, decoded_token.claims.public_metadata.role);
-            return Err(AuthError::NotAnAdmin);
-        }
-
-        // If all checks pass, return the authenticated admin user's ID
-        Ok(AdminUser { id: decoded_token.claims.sub })
+        // If successful, return the user's ID
+        Ok(AuthenticatedUser { id: decoded.claims.sub })
     }
 }
 
-// --- Custom Error Type ---
+// --- The Handler for User Login ---
+#[derive(Deserialize)]
+pub struct LoginPayload {
+    username: String,
+    password: String,
+}
+
+pub async fn login_handler(
+    State(state): State<AppState>,
+    jar: CookieJar,
+    Json(payload): Json<LoginPayload>,
+) -> Result<(CookieJar, Json<User>), AuthError> {
+    let conn = state.get().await.map_err(|_| AuthError::Internal)?;
+    
+    // Find the user by their username
+    let user_row = conn.query_opt("SELECT id, username, password_hash FROM users WHERE username = $1", &[&payload.username])
+        .await.map_err(|_| AuthError::Internal)?;
+
+    // If no user is found, return an invalid credentials error
+    let user_row = user_row.ok_or(AuthError::InvalidCredentials)?;
+    
+    let user = User {
+        id: user_row.get("id"),
+        username: user_row.get("username"),
+    };
+    let password_hash: String = user_row.get("password_hash");
+
+    // Verify the provided password against the stored hash
+    if !verify(&payload.password, &password_hash)? {
+        return Err(AuthError::InvalidCredentials);
+    }
+    
+    // If the password is correct, create JWT claims
+    let now = Utc::now();
+    let claims = Claims {
+        sub: user.id,
+        iat: now.timestamp(),
+        exp: (now + Duration::days(7)).timestamp(), // Token is valid for 7 days
+    };
+    
+    let jwt_secret = std::env::var("JWT_SECRET").map_err(|_| AuthError::Internal)?;
+    let encoding_key = EncodingKey::from_secret(jwt_secret.as_bytes());
+
+    // Encode the token
+    let token = encode(&Header::default(), &claims, &encoding_key)?;
+
+    // Build the secure, HttpOnly cookie
+    let cookie = Cookie::build((JWT_COOKIE_NAME.to_string(), token))
+        .path("/")
+        .http_only(true) // Prevents JavaScript from accessing the cookie
+        .secure(true)     // Only send over HTTPS in production
+        .same_site(SameSite::Lax)
+        .build();
+
+    // Return the new cookie jar and the user's information (without the password hash)
+    Ok((jar.add(cookie), Json(user)))
+}
+
+// --- The Handler for User Logout ---
+pub async fn logout_handler(jar: CookieJar) -> Result<CookieJar, AuthError> {
+    // Create a cookie that has the same name but is expired, effectively deleting it
+    let cookie = Cookie::build(JWT_COOKIE_NAME)
+        .path("/")
+        .http_only(true)
+        .secure(true)
+        .same_site(SameSite::Lax)
+        .expires(OffsetDateTime::UNIX_EPOCH) // Set expiration to a time in the past
+        .build();
+
+    Ok(jar.add(cookie))
+}
+
+// --- Custom Error Type for Clearer Rejections ---
 
 #[derive(Debug, Error)]
 pub enum AuthError {
     #[error("missing authorization token")]
     MissingToken,
-    #[error("invalid authorization token")]
-    InvalidToken,
-    #[error("user is not an admin")]
-    NotAnAdmin,
+    #[error("invalid username or password")]
+    InvalidCredentials,
     #[error("internal server error")]
     Internal,
-    #[error("reqwest error: {0}")]
-    Reqwest(#[from] reqwest::Error),
     #[error("jsonwebtoken error: {0}")]
     JsonWebToken(#[from] jsonwebtoken::errors::Error),
-    #[error("serde_json error: {0}")]
-    SerdeJson(#[from] serde_json::Error),
-    #[error("base64 decode error: {0}")]
-    Base64Decode(#[from] base64::DecodeError),
+    #[error("bcrypt error: {0}")]
+    Bcrypt(#[from] bcrypt::BcryptError),
 }
 
 impl IntoResponse for AuthError {
@@ -172,8 +146,8 @@ impl IntoResponse for AuthError {
         eprintln!("[AUTH ERROR] {:?}", self);
         
         let (status, error_message) = match self {
-            AuthError::MissingToken | AuthError::InvalidToken => (StatusCode::UNAUTHORIZED, self.to_string()),
-            AuthError::NotAnAdmin => (StatusCode::FORBIDDEN, self.to_string()),
+            AuthError::MissingToken | AuthError::InvalidCredentials => (StatusCode::UNAUTHORIZED, self.to_string()),
+            AuthError::Internal => (StatusCode::INTERNAL_SERVER_ERROR, "An internal error occurred".to_string()),
             _ => (StatusCode::INTERNAL_SERVER_ERROR, "An internal error occurred".to_string()),
         };
         (status, Json(serde_json::json!({ "error": error_message }))).into_response()

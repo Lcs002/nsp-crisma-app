@@ -22,6 +22,10 @@ async fn main() {
 
     // --- THIS IS THE REFACTORED ROUTER ---
 
+    let auth_routes = Router::new()
+        .route("/login", post(auth::login_handler))
+        .route("/logout", post(auth::logout_handler));
+
     // Define routes for Participants (Confirmands)
     let confirmands_routes = Router::new()
         .route("/", get(handlers::list_confirmands).post(handlers::create_confirmand))
@@ -49,8 +53,6 @@ async fn main() {
             delete(handlers::remove_participant_from_group),
         );
 
-
-
     // Combine all the routers into the main app router using `nest`
     let app = Router::new()
         .route("/api/dashboard/stats", get(handlers::get_dashboard_stats))
@@ -58,6 +60,7 @@ async fn main() {
         .nest("/api/confirmands", confirmands_routes)
         .nest("/api/catechists", catechists_routes)
         .nest("/api/groups", groups_routes)
+        .nest("/api/auth", auth_routes)
         //.layer(middleware::from_fn(auth::auth_middleware))
         .with_state(app_state);
 

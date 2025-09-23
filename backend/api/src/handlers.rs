@@ -1,13 +1,12 @@
 use axum::{extract::{Path, State}, http::StatusCode, Json, body::Body, BoxError};
-use crate::{models::{GroupSummary, DashboardStats, MaritalStatus, Confirmand, CreateConfirmand, Catechist, CreateCatechist, CatechistDetails, ConfirmationGroup, CreateConfirmationGroup, AddParticipantToGroup, ConfirmationGroupDetails, Sacrament, ConfirmandDetails, UpdateParticipantSacrament}, AppState};
+use crate::{models::{User, GroupSummary, DashboardStats, MaritalStatus, Confirmand, CreateConfirmand, Catechist, CreateCatechist, CatechistDetails, ConfirmationGroup, CreateConfirmationGroup, AddParticipantToGroup, ConfirmationGroupDetails, Sacrament, ConfirmandDetails, UpdateParticipantSacrament}, AppState, auth::AuthenticatedUser};
 use csv::ReaderBuilder; // --- NEW ---
 use std::io::Cursor; // --- NEW ---
 use chrono::NaiveDate;
-use crate::auth::{self, AdminUser};
 use serde_json::json; // --- NEW ---
 
 // MODIFIED: The SELECT query now LEFT JOINs to find the current group for each participant.
-pub async fn list_confirmands(_: AdminUser, State(state): State<AppState>) -> Result<Json<Vec<Confirmand>>, (StatusCode, String)> {
+pub async fn list_confirmands(user: AuthenticatedUser, State(state): State<AppState>) -> Result<Json<Vec<Confirmand>>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
 
     // --- MODIFICATION: The SQL query now also selects the group's start_date ---
@@ -30,7 +29,7 @@ pub async fn list_confirmands(_: AdminUser, State(state): State<AppState>) -> Re
 }
 // MODIFICATION: The INSERT and RETURNING statements now include all columns.
 pub async fn create_confirmand(
-    _: AdminUser,
+    user: AuthenticatedUser,
     State(state): State<AppState>,
     Json(payload): Json<CreateConfirmand>,
 ) -> Result<(StatusCode, Json<Confirmand>), (StatusCode, String)> {
@@ -87,7 +86,7 @@ pub async fn create_confirmand(
 }
 
 pub async fn update_confirmand(
-    _: AdminUser,  // Ensure only admins can access this endpoint
+    user: AuthenticatedUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
     Path(id): Path<i32>,
     Json(payload): Json<CreateConfirmand>,
@@ -140,7 +139,7 @@ pub async fn update_confirmand(
 }
 
 pub async fn delete_confirmand(
-    _: AdminUser,  // Ensure only admins can access this endpoint
+    user: AuthenticatedUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -157,7 +156,7 @@ pub async fn delete_confirmand(
 
 // Handler for `GET /api/catechists`
 pub async fn list_catechists(
-    _: AdminUser,  // Ensure only admins can access this endpoint
+    user: AuthenticatedUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Catechist>>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
@@ -191,7 +190,7 @@ pub async fn list_catechists(
 }
 
 pub async fn get_catechist_details(
-    _: AdminUser,  // Ensure only admins can access this endpoint
+    user: AuthenticatedUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<CatechistDetails>, (StatusCode, String)> {
@@ -248,7 +247,7 @@ pub async fn get_catechist_details(
 
 // Handler for `POST /api/catechists`
 pub async fn create_catechist(
-    user: AdminUser,
+    user: AuthenticatedUser,
     State(state): State<AppState>,
     Json(payload): Json<CreateCatechist>,
 ) -> Result<(StatusCode, Json<Catechist>), (StatusCode, String)> {
@@ -299,7 +298,7 @@ pub async fn create_catechist(
 
 // Handler for `GET /api/groups`
 pub async fn list_groups(
-    _: AdminUser,  // Ensure only admins can access this endpoint
+    user: AuthenticatedUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ConfirmationGroup>>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
@@ -325,7 +324,7 @@ pub async fn list_groups(
 
 // Handler for `POST /api/groups`
 pub async fn create_group(
-    _: AdminUser,  // Ensure only admins can access this endpoint
+    user: AuthenticatedUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
     Json(payload): Json<CreateConfirmationGroup>,
 ) -> Result<(StatusCode, Json<ConfirmationGroup>), (StatusCode, String)> {
@@ -374,7 +373,7 @@ pub async fn create_group(
 }
 
 pub async fn get_group_details(
-    _: AdminUser,  // Ensure only admins can access this endpoint
+    user: AuthenticatedUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<ConfirmationGroupDetails>, (StatusCode, String)> {
@@ -423,7 +422,7 @@ pub async fn get_group_details(
 
 // --- NEW --- Handler for `POST /api/groups/:id/participants`
 pub async fn add_participant_to_group(
-    _: AdminUser,
+    user: AuthenticatedUser,
     State(state): State<AppState>,
     Path(group_id): Path<i32>,
     Json(payload): Json<AddParticipantToGroup>,
@@ -448,7 +447,7 @@ pub async fn add_participant_to_group(
 }
 
 pub async fn remove_participant_from_group(
-    _: AdminUser,  // Ensure only admins can access this endpoint
+    user: AuthenticatedUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
     Path((group_id, confirmand_id)): Path<(i32, i32)>, // Axum can extract multiple path params into a tuple
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -468,7 +467,7 @@ pub async fn remove_participant_from_group(
 
 // Handler for `GET /api/sacraments`
 pub async fn list_all_sacraments(
-    _: AdminUser,  // Ensure only admins can access this endpoint
+    user: AuthenticatedUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Sacrament>>, (StatusCode, String)> {
     let conn = state.get().await.map_err(internal_error)?;
@@ -483,7 +482,7 @@ pub async fn list_all_sacraments(
 // Handler for `GET /api/confirmands/:id/details`
 // MODIFIED: This handler now also fetches the participant's entire group history.
 pub async fn get_participant_details(
-    _: AdminUser,
+    user: AuthenticatedUser,
     State(state): State<AppState>,
     Path(id): Path<i32>,
 ) -> Result<Json<ConfirmandDetails>, (StatusCode, String)> {
@@ -548,7 +547,7 @@ pub async fn get_participant_details(
 
 // Handler for `POST /api/confirmands/:id/sacraments`
 pub async fn add_sacrament_to_participant(
-    _: AdminUser,  // Ensure only admins can access this endpoint
+    user: AuthenticatedUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
     Path(confirmand_id): Path<i32>,
     Json(payload): Json<UpdateParticipantSacrament>,
@@ -564,7 +563,7 @@ pub async fn add_sacrament_to_participant(
 
 // Handler for `DELETE /api/confirmands/:confirmandId/sacraments/:sacramentId`
 pub async fn remove_sacrament_from_participant(
-    _: AdminUser,  // Ensure only admins can access this endpoint
+    user: AuthenticatedUser,  // Ensure only admins can access this endpoint
     State(state): State<AppState>,
     Path((confirmand_id, sacrament_id)): Path<(i32, i16)>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -579,7 +578,7 @@ pub async fn remove_sacrament_from_participant(
 // ===================================================================
 
 pub async fn import_confirmands_from_csv(
-    _: AdminUser,
+    user: AuthenticatedUser,
     State(state): State<AppState>,
     body: String,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
@@ -679,7 +678,7 @@ pub async fn import_confirmands_from_csv(
 }
 
 pub async fn get_dashboard_stats(
-    _: AdminUser,
+    user: AuthenticatedUser,
     State(state): State<AppState>,
 ) -> Result<Json<DashboardStats>, (StatusCode, String)> {
     // MODIFIED: The connection is now mutable
@@ -700,6 +699,20 @@ pub async fn get_dashboard_stats(
     };
 
     Ok(Json(stats))
+}
+
+pub async fn me_handler(
+    user: AuthenticatedUser, // PROTECTED
+    State(state): State<AppState>,
+) -> Result<Json<User>, (StatusCode, String)> {
+    let conn = state.get().await.map_err(internal_error)?;
+    let row = conn.query_opt("SELECT id, username FROM users WHERE id = $1", &[&user.id])
+        .await.map_err(internal_error)?;
+    if let Some(row) = row {
+        Ok(Json(User { id: row.get("id"), username: row.get("username") }))
+    } else {
+        Err((StatusCode::NOT_FOUND, "User not found".to_string()))
+    }
 }
 
 fn internal_error<E>(err: E) -> (StatusCode, String)

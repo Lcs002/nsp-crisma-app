@@ -3,6 +3,12 @@ use serde::{Deserialize, Serialize};
 use tokio_postgres::Row;
 use strum::{Display, EnumString};
 
+#[derive(Serialize, Clone, Debug)]
+pub struct User {
+    pub id: i32,
+    pub username: String,
+}
+
 // ===================================================================
 // --- NEW --- Dashboard Models --- NEW ---
 // ===================================================================

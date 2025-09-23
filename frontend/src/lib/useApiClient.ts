@@ -1,58 +1,66 @@
-import { useAuth } from '@clerk/nextjs';
+'use client';
+
 import { useCallback, useMemo } from 'react';
 
-// This custom hook provides an authenticated API client.
+// This custom hook provides a simple, consistent way to make API calls.
 export function useApiClient() {
-  const { getToken } = useAuth();
 
-  const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}): Promise<Response> => {
-    // --- THIS IS THE DEFINITIVE FIX ---
-    // We must explicitly ask for the token from our custom template.
-    // Replace 'default-vercel-with-roles' with the actual name of your JWT template.
-    const token = await getToken({ template: 'Vercel' });
-    // --- END FIX ---
-
-    if (!token) {
-        throw new Error("User is not authenticated or token is unavailable. Cannot make API call.");
-    }
-
-    const headers = new Headers(options.headers || {});
-    headers.set('Authorization', `Bearer ${token}`);
-
-    const response = await fetch(url, { ...options, headers });
+  const fetcher = useCallback(async (url: string, options: RequestInit = {}): Promise<Response> => {
+    const response = await fetch(url, { ...options });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(errorBody || `Request failed with status ${response.status}`);
+      let errorBody;
+      try {
+        errorBody = await response.json();
+      } catch (e) {
+        errorBody = await response.text();
+      }
+      const errorMessage = errorBody?.error || errorBody || `Request failed with status ${response.status}`;
+      throw new Error(errorMessage);
     }
     return response;
-  }, [getToken]);
+  }, []);
 
   const api = useMemo(() => ({
     get: async <T>(url: string): Promise<T> => {
-      const response = await fetchWithAuth(url);
+      const response = await fetcher(url);
       return response.json();
     },
+
+    // --- THIS IS THE FIX ---
+    // The return type is now a strict `Promise<T>`.
     post: async <T>(url: string, body: any): Promise<T> => {
-      const response = await fetchWithAuth(url, {
+      const response = await fetcher(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      return response.json();
+      const text = await response.text();
+      if (!text) {
+        // If the body is empty, we throw an error as the caller expects a response.
+        throw new Error("API returned a successful but empty response.");
+      }
+      return JSON.parse(text);
     },
+
     put: async <T>(url: string, body: any): Promise<T> => {
-      const response = await fetchWithAuth(url, {
+      const response = await fetcher(url, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      return response.json();
+      const text = await response.text();
+      if (!text) {
+        throw new Error("API returned a successful but empty response.");
+      }
+      return JSON.parse(text);
     },
+    // --- END FIX ---
+
     delete: async (url: string): Promise<Response> => {
-      return fetchWithAuth(url, { method: 'DELETE' });
+      return fetcher(url, { method: 'DELETE' });
     },
-  }), [fetchWithAuth]);
+  }), [fetcher]);
 
   return api;
 }
