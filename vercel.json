@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "backend/api",
+      "src": "backend/api/",
       "use": "vercel-rust"
     },
     {
@@ -14,7 +14,7 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "/backend/api/main.rs"
+      "dest": "/backend/api"
     },
     {
       "src": "/(.*)",
