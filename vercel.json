@@ -7,21 +7,13 @@
     },
     {
       "src": "frontend/package.json",
-      "use": "@vercel/next",
-      "config": { "zeroConfig": true }
+      "use": "@vercel/next"
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "/backend/api"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "frontend"
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
     }
   ]
 }
